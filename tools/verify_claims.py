@@ -41,7 +41,14 @@ def fetch(url):
 def forms(n):
     out = {f'{n:,}', str(n), f'{n:,}'.replace(',', '.'), f'{n:,}'.replace(',', ' ')}
     if n >= 1000: out |= {f'{n/1000:g}k', f'{n/1000:g} thousand', f'{n/1000:g},000'}
-    if n >= 10000: out |= {f'{n/10000:g}万', f'{n/10000:g} 万'}
+    if n >= 10000:
+        out |= {f'{n/10000:g}万', f'{n/10000:g} 万'}
+        a, b = divmod(n, 10000)  # Korean: 1만 5천 / 1만5000 / 1만 2000
+        if b == 0: out |= {f'{a}만 명', f'{a}만 대', f'{a}만명', f'{a}만대', f'{a}만 개'}
+        else:
+            for sp in ('', ' '):
+                out |= {f'{a}만{sp}{b}', f'{a}만{sp}{b:,}'}
+                if b % 1000 == 0: out |= {f'{a}만{sp}{b // 1000}천'}
     if n >= 1e6: out |= {f'{n/1e6:g} million'}
     return out
 

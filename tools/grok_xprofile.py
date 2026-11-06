@@ -2,17 +2,20 @@
 """Deep-mine one X account's research for robot deployment numbers, trace each to its primary source,
 then expand every primary source into ALL the robot-company numbers it contains. Grok (xAI) web+X search.
 Stages (resumable; each call cached as a JSON file):
+  probe    one cheap call: does the account post company unit counts at all? -> probe.json
   harvest  month windows of the handle's posts -> research/grok/x_<handle>/harvest/<YYYY-MM>.json
   trace    one call per (company, number) -> primary source url + verbatim quote -> trace/<slug>.json
   expand   one call per distinct primary source document -> all companies' numbers -> expand/<slug>.json
   claims   parse all stages -> research/grok/x_<handle>/claims_raw.jsonl (verify with tools/grok_verify.py --dir)
-Usage: python3 -I tools/grok_xprofile.py <handle> <stage> [--from 2023-01] [--workers 8]
+Usage: python3 -I tools/grok_xprofile.py <handle> <stage> [--from 2023-01] [--workers 8] [--substack https://www.example.com]
+  substack needs research/grok/x_<handle>/substack/archive.json (posts from <domain>/api/v1/archive, cursor-paged)
 Key: GCP Secret Manager XAI_API_KEY (never printed)."""
 import concurrent.futures as cf, glob, hashlib, json, os, re, subprocess, sys, time, urllib.request
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 H, STAGE = sys.argv[1].lstrip('@'), sys.argv[2]
 arg = lambda k, d: sys.argv[sys.argv.index(k) + 1] if k in sys.argv else d
 FROM, WORKERS, MODEL = arg('--from', '2023-01'), int(arg('--workers', '8')), arg('--model', 'grok-4.3')
+SUB = arg('--substack', 'https://read.corematter.com')  # newsletter domain for the substack stage
 BASE = f'{ROOT}/research/grok/x_{H}'
 for d in ('harvest', 'trace', 'expand'): os.makedirs(f'{BASE}/{d}', exist_ok=True)
 KEY = subprocess.run(['gcloud', 'secrets', 'versions', 'access', 'latest', '--secret=XAI_API_KEY', '--project',
@@ -49,20 +52,25 @@ def months():
         yield f'{y}-{m:02d}-01', f'{nxt[0]}-{nxt[1]:02d}-01', f'{y}-{m:02d}'
         y, m = nxt
 
-HARVEST = """Run at least 8 separate x_search queries restricted to @{h} for {a} to {b} (e.g. robots, humanoid, shipped, units, deployed, fleet, sold, orders, revenue, prospectus, IPO, drone, robotaxi, plus any company names you discover), and read her threads fully. Cover ALL posts by @{h} from {a} to {b} (original posts, threads, replies, quote posts, and the text/numbers in any charts or images she attached).
-She researches robotics / physical AI. Find EVERY number about how many robots (or drones, AVs, robotic units) a specific company has shipped, sold, delivered, deployed, installed, has in its fleet, produces per year, or has on order.
-For each number return the company, the number, what it measures, the period, the verbatim post text (<=300 chars), the post URL, and the SOURCE she relies on (a linked article/filing/report URL, a quoted account, or a named document like "AgiBot prospectus", "Agility S-4", "IFR World Robotics", "GGII report"). Include numbers inside charts/tables she posted (say "chart").
+HARVEST = """Run at least 8 separate x_search queries restricted to @{h} for {a} to {b} (e.g. robots, humanoid, shipped, units, deployed, fleet, sold, orders, revenue, prospectus, IPO, drone, robotaxi, plus any company names you discover), and read their threads fully. Cover ALL posts by @{h} from {a} to {b} (original posts, threads, replies, quote posts, and the text/numbers in any charts or images she attached).
+The account posts about robotics / physical AI. Find EVERY number about how many robots (or drones, AVs, robotic units) a specific company has shipped, sold, delivered, deployed, installed, has in its fleet, produces per year, or has on order.
+For each number return the company, the number, what it measures, the period, the verbatim post text (<=300 chars), the post URL, and the SOURCE relied on (a linked article/filing/report URL, a quoted account, or a named document like "AgiBot prospectus", "Agility S-4", "IFR World Robotics", "GGII report"). Include numbers inside charts/tables posted (say "chart").
 Reply ONLY a JSON list: [{{"company","count":<integer>,"metric":"{metrics}","period":"YYYY or YYYY-MM or 1H2026","post_url","post_date","verbatim","cited_source_name","cited_source_url":null|"https://..."}}]. Empty list [] if none."""
 
 TRACE = """Find the PRIMARY public source for this robot-count claim and quote it verbatim.
-Claim (from X user @{h}, {post_url}): {company} — {count} ({metric}, {period}). Post text: "{verbatim}". She cites: {src}.
-Search the web (filings on SEC EDGAR / HKEX / SSE, prospectuses, company press releases, annual reports, IR decks, reputable news) for the original document that states this number. Prefer the issuer's own filing or release. If the number is her own calculation, find the inputs.
+Claim (from X user @{h}, {post_url}): {company} — {count} ({metric}, {period}). Post text: "{verbatim}". Cited source: {src}.
+Search the web (filings on SEC EDGAR / HKEX / SSE, prospectuses, company press releases, annual reports, IR decks, reputable news) for the original document that states this number. Prefer the issuer's own filing or release. If the number is the poster's own calculation, find the inputs.
 Reply ONLY JSON: {{"company","count":<integer>,"metric":"{metrics}","as_of":"YYYY-MM","primary_url":"https://...","primary_title","document_type":"filing|prospectus|company_pr|annual_report|news|report|x_post|other","quote":"<verbatim text from that page containing the number, <=300 chars>","matches_claim":true|false,"other_companies_in_document":true|false,"notes"}}"""
 
 EXPAND = """This public document contains robot deployment/shipment numbers: {title} — {url}
 (It may be a prospectus/filing with an industry section, a market report, or an article.) Use web search to read it (and its sections / the issuer's IR page / reputable coverage quoting it).
 Extract EVERY company-level number of robots shipped, sold, delivered, deployed, installed, in fleet, produced, or on order — for the issuer AND every competitor or customer named in it (industry tables like "shipments by company" often list many). Include all years given.
 Reply ONLY a JSON list: [{{"company","count":<integer>,"metric":"{metrics}","as_of":"YYYY or YYYY-MM","quote":"<verbatim text or table row from the document, <=300 chars>","source_url":"<most specific URL where this text appears>","source_title"}}]. [] if none."""
+
+
+PROBE = """Triage: does X account @{h} post SPECIFIC robot deployment numbers? Run at least 6 x_search queries restricted to @{h} from {a} to {b} (robots shipped, deployed, units, fleet, delivered, sold, humanoid, robotaxi, drones, orders, "1,000th", prospectus) with image understanding on.
+Return up to 15 of the best examples where a post states how many robots/drones/AVs a NAMED company has shipped, deployed, delivered, sold, has in fleet, or has on order (a concrete number, not market-size $ or forecasts).
+Reply ONLY JSON: {{"handle":"{h}","posts_about_robots":"none|few|many","examples":[{{"company","count":<integer>,"metric":"{metrics}","post_url","verbatim":"<=200 chars","cited_source":null|"name or url"}}],"notes":"<one line on what this account mostly posts>"}}"""
 
 def run(jobs):
     spent = 0
@@ -82,7 +90,7 @@ def substack_text(slug):
     import html as H_
     f = f'{BASE}/substack/{slug}.txt'
     if os.path.exists(f): return open(f).read()
-    d = json.load(urllib.request.urlopen(urllib.request.Request(f'https://read.corematter.com/api/v1/posts/{slug}', headers={'User-Agent': 'Mozilla/5.0'}), timeout=60))
+    d = json.load(urllib.request.urlopen(urllib.request.Request(f'{SUB}/api/v1/posts/{slug}', headers={'User-Agent': 'Mozilla/5.0'}), timeout=60))
     b = d.get('body_html') or d.get('truncated_body_text') or ''
     b = re.sub(r'(?is)<a [^>]*href="([^"]+)"[^>]*>(.*?)</a>', r'\2 [\1]', b)
     b = re.sub(r'(?is)</(p|h\d|li|tr)>', '\n', b); b = re.sub(r'(?is)<(td|th)[^>]*>', ' | ', b)
@@ -108,7 +116,12 @@ def traced():
         if isinstance(x, dict) and x.get('primary_url'): out.append(x)
     return out
 
-if STAGE == 'harvest':
+if STAGE == 'probe':
+    r = grok(PROBE.format(h=H, a='2024-06-01', b='2026-11-06', metrics=METRICS),
+             [{'type': 'x_search', 'allowed_x_handles': [H], 'from_date': '2024-06-01', 'to_date': '2026-11-06', 'enable_image_understanding': True}], f'{BASE}/probe.json')
+    j = parse(r['text']) or {}; ex = [e for e in j.get('examples') or [] if isinstance(e, dict) and e.get('count')]
+    print(f"@{H}: {len(ex)} examples, {j.get('posts_about_robots')}, ${r.get('cost_usd',0):.3f} | {str(j.get('notes'))[:120]}")
+elif STAGE == 'harvest':
     xs = lambda a, b: [{'type': 'x_search', 'allowed_x_handles': [H], 'from_date': a, 'to_date': b, 'enable_image_understanding': True}]
     run([(HARVEST.format(h=H, a=a, b=b, metrics=METRICS), xs(a, b), f'{BASE}/harvest/{m}.json') for a, b, m in months()])
     print(len(harvested()), 'distinct numbers harvested')
@@ -118,7 +131,7 @@ elif STAGE == 'substack':
         try: t = substack_text(p['slug'])
         except Exception as e: print('fetch fail', p['slug'], e); continue
         if len(t) < 300: continue
-        url = p.get('canonical_url') or f"https://read.corematter.com/p/{p['slug']}"
+        url = p.get('canonical_url') or f"{SUB}/p/{p['slug']}"
         for i in range(0, len(t), 60000):  # long posts (e.g. roadshow transcript) in chunks
             jobs.append((SUBSTACK.format(h=H, title=p['title'], url=url, date=p['post_date'][:10], metrics=METRICS, text=t[i:i + 60000]), [], f"{BASE}/substack/{p['slug']}_{i // 60000}.json"))
     run(jobs); print(len(harvested()), 'distinct numbers (X + Substack)')
