@@ -50,4 +50,6 @@ sender agent@teahose.com). Railway vars: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS
 
 ## Data model
 See research/SCHEMA.md (claims, metrics, autonomy/robot test, receipts) and research/TAXONOMY.md (use cases, verticals).
+`added_at` = when a company was first loaded into the live DB (Postgres `company_added`, never truncated; pre-existing
+companies backfilled from `server/added_seed.json`). To act on "companies added after X", filter `/api/data` by `added_at`.
 Headline = max credible shipped/deployed/installed/fleet claim; orders, pilots and capacity never count as shipped.

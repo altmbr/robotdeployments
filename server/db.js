@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const { Pool } = require('pg');
 
 const DATA = path.join(__dirname, '..', 'public', 'data.json');
+const SEED = path.join(__dirname, 'added_seed.json');  // backfilled first-load times for companies that predate company_added
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: /sslmode=require|proxy\.rlwy\.net/.test(process.env.DATABASE_URL || '') ? { rejectUnauthorized: false } : false,
@@ -20,6 +21,10 @@ CREATE TABLE IF NOT EXISTS companies (
   primary_vertical text, primary_use_case text, funded_12m boolean, raised_12m double precision,
   lifecycle text, row jsonb NOT NULL                        -- every public field (without claims/rounds)
 );
+-- When each company was first loaded into this database. Never truncated (unlike companies/claims/rounds), so the
+-- timestamp survives every reload. Companies that predate this table were backfilled from server/added_seed.json
+-- (time of the first pushed commit of public/data.json that contained them).
+CREATE TABLE IF NOT EXISTS company_added (company text PRIMARY KEY, added_at timestamptz NOT NULL DEFAULT now());
 CREATE TABLE IF NOT EXISTS claims (
   id serial PRIMARY KEY, company text NOT NULL REFERENCES companies(company) ON DELETE CASCADE,
   count double precision, metric text, as_of text, type text, url text, quote text, conf text, source text
@@ -65,6 +70,11 @@ async function load() {
             [r.company, x.stage, x.date, x.amount, JSON.stringify(x.leads || []), x.url, x.quote]);
       }
     }
+    const seed = fs.existsSync(SEED) ? JSON.parse(fs.readFileSync(SEED)) : {};
+    for (const [list, rows] of [['live', d.companies], ['gone', d.gone || []]])
+      for (const r of rows)
+        await c.query('INSERT INTO company_added (company, added_at) VALUES ($1, COALESCE($2::timestamptz, now())) ON CONFLICT (company) DO NOTHING',
+          [r.company, seed[r.company] || null]);
     const metaRows = { data_hash: hash, built: d.built, use_case_names: JSON.stringify(d.use_case_names),
       vertical_names: JSON.stringify(d.vertical_names), stage_order: JSON.stringify(d.stage_order) };
     for (const [k, v] of Object.entries(metaRows))
@@ -82,7 +92,7 @@ async function load() {
 // Rebuild the ROBOT_DATA object the front end expects, from the database.
 async function dataset() {
   const [co, cl, ro, me] = await Promise.all([
-    pool.query('SELECT company, list, row FROM companies'),
+    pool.query('SELECT c.company, c.list, c.row, a.added_at FROM companies c LEFT JOIN company_added a USING (company)'),
     pool.query('SELECT company,count,metric,as_of,type,url,quote,conf,source FROM claims ORDER BY id'),
     pool.query('SELECT company,stage,date,amount,leads,url,quote FROM rounds ORDER BY id'),
     pool.query('SELECT key, value FROM meta'),
@@ -90,8 +100,8 @@ async function dataset() {
   const by = (rows) => rows.reduce((m, { company, ...x }) => ((m[company] ||= []).push(x), m), {});
   const C = by(cl.rows), R = by(ro.rows), M = Object.fromEntries(me.rows.map((r) => [r.key, r.value]));
   const out = { companies: [], gone: [] };
-  for (const { company, list, row } of co.rows) {
-    const r = { ...row, claims: C[company] || [], rounds: R[company] || [] };
+  for (const { company, list, row, added_at } of co.rows) {
+    const r = { ...row, added_at: added_at ? added_at.toISOString() : null, claims: C[company] || [], rounds: R[company] || [] };
     (list === 'gone' ? out.gone : out.companies).push(r);
   }
   out.companies.sort((a, b) => (b.units || 0) - (a.units || 0));
