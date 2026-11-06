@@ -40,7 +40,8 @@ out = []
 for r in rows:
     if r['board'] in ('aggregate', 'excluded'): continue
     if 'gmail' in (r['source_url'] or '').lower(): r['source_url'], r['quote'] = '', ''
-    cl = sorted(claims.get(r['company'].lower(), []), key=lambda c: str(c.get('as_of') or ''), reverse=True)[:12]
+    # keep ALL claims (publish.py recomputes the headline from them; a recency cap silently dropped the headline claim)
+    cl = sorted(claims.get(r['company'].lower(), []), key=lambda c: str(c.get('as_of') or ''), reverse=True)
     # Uncounted companies ship too (units 0): tracked, but no public shipped/installed number yet.
     out.append({
         'company': r['company'], 'board': r['board'], 'segment': r['segment'] or 'other',
