@@ -206,5 +206,5 @@ print(f'enriched {n_enriched}/{len(out)} companies; funded last 12m: {sum(r["fun
 os.makedirs(f'{ROOT}/viz', exist_ok=True)
 meta = json.load(open(f'{ROOT}/data/aggregates.json'))
 with open(f'{ROOT}/viz/data.js', 'w') as fh:
-    fh.write('window.ROBOT_DATA = ' + json.dumps({'companies': out, 'gone': gone, 'n_claims': meta['n_claims'], 'built': '2026-11-05', 'use_case_names': UC_NAMES, 'vertical_names': V_NAMES, 'stage_order': STAGE_ORDER}, ensure_ascii=False) + ';\n')
+    fh.write('window.ROBOT_DATA = ' + json.dumps({'companies': out, 'gone': gone, 'n_claims': meta['n_claims'], 'built': __import__('datetime').date.today().isoformat(), 'use_case_names': UC_NAMES, 'vertical_names': V_NAMES, 'stage_order': STAGE_ORDER}, ensure_ascii=False) + ';\n')
 print(len(out), 'companies →', f'{ROOT}/viz/data.js')

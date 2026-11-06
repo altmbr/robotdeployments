@@ -36,6 +36,9 @@ function build(data) {
   const VN = data.vertical_names || {}, UCN = data.use_case_names || {};
   const total = live.reduce((t, d) => t + d.units, 0);
   const built = data.built;
+  // creator = the index itself (never a person: no owner attribution in public fields); CC BY 4.0 = reuse with credit
+  const CREATOR = { '@type': 'Organization', name: 'Robot Deployment Index', url: SITE };
+  const LICENSE = 'https://creativecommons.org/licenses/by/4.0/';
 
   const shell = ({ title, desc, path, body, jsonld }) => `<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -96,7 +99,7 @@ ${related.length ? `<h2>Similar companies</h2><div class="card">${related.map((x
 <p class="muted">Know a newer number? <a href="${BASE}?submit=${slug}">Submit it</a>.</p>`;
     const jsonld = [
       { '@context': 'https://schema.org', '@type': 'Dataset', name: `${d.company} robot deployment count`, description: desc, url: `${SITE}/companies/${slug}`,
-        isPartOf: { '@type': 'Dataset', name: 'Robot Deployment Index', url: SITE }, dateModified: built,
+        isPartOf: { '@type': 'Dataset', name: 'Robot Deployment Index', url: SITE }, dateModified: built, creator: CREATOR, license: LICENSE,
         about: { '@type': 'Organization', name: d.company, ...(d.website ? { url: d.website } : {}) },
         variableMeasured: { '@type': 'PropertyValue', name: `robots ${phrase}`, value: d.units, ...(d.as_of ? { observationDate: d.as_of } : {}) } },
       { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: [{ '@type': 'Question', name: `How many robots has ${d.company} deployed?`,
@@ -134,7 +137,7 @@ ${related.length ? `<h2>Similar companies</h2><div class="card">${related.map((x
 <p><a href="${BASE}/companies">All ${live.length} companies</a></p></div>`;
   const indexJsonld = { '@context': 'https://schema.org', '@type': 'Dataset', name: 'Robot Deployment Index',
     description: 'A sourced, company-level database of how many robots each company has shipped or deployed, by industry, task, country and funding.',
-    url: SITE, dateModified: built,
+    url: SITE, dateModified: built, creator: CREATOR, license: LICENSE,
     keywords: ['robots deployed', 'robot shipments', 'humanoid robots', 'warehouse robots', 'robotaxi fleet', 'industrial robots', 'robot statistics'],
     variableMeasured: 'Robots shipped, deployed, installed or in fleet per company', isAccessibleForFree: true,
     distribution: { '@type': 'DataDownload', encodingFormat: 'application/json', contentUrl: `${SITE}/api/data` } };
