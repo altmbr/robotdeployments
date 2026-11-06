@@ -316,6 +316,15 @@
       if (el) { this.ro = new ResizeObserver(() => this.setState({ w: el.clientWidth })); this.ro.observe(el); }
     };
     componentDidMount() {
+      // deep links from the server-rendered company pages: ?c=<slug> opens the panel, ?submit=<slug> opens the form
+      const qs = new URLSearchParams(location.search), want = qs.get('c') || qs.get('submit');
+      if (want) {
+        const slug = (n) => String(n).normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\(.*?\)/g, ' ')
+          .replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+        const R = window.RDI, d = R.D.concat(R.GONE).find((x) => slug(x.company) === want);
+        if (d) { if (qs.get('submit')) this.openSub(d); else this.setState({ sel: d, cat: 'all', zoom: null }); }
+        history.replaceState(null, '', location.pathname);
+      }
       this.onKey = (e) => { if (e.key !== 'Escape') return;
         this.setState((s) => s.sub ? (s.sub.ac ? { sub: { ...s.sub, ac: false } } : { sub: null }) : s.menu ? { menu: null, menuQ: '' } : { sel: null }); };
       window.addEventListener('keydown', this.onKey);
@@ -601,7 +610,7 @@
         ${v.anyOpen && html`<div onClick=${v.closeAll} style=${S('position:fixed;inset:0;z-index:19')}></div>`}
 
         <header style=${S('display:flex;align-items:center;gap:10px 14px;flex-wrap:wrap')}>
-          <span style=${S('font-size:14px;font-weight:650;white-space:nowrap')}>Robot Deployment Index</span>
+          <h1 style=${S('font-size:14px;font-weight:650;white-space:nowrap;margin:0')}>Robot Deployment Index</h1>
           <span style=${S('font-size:12.5px;color:#8a8984;white-space:nowrap')}>Updated ${v.built}</span>
           <div style=${S('display:flex;align-items:center;gap:10px;margin-left:auto;flex:1 1 auto;justify-content:flex-end;min-width:0')}>
             <div style=${S('position:relative;z-index:21;flex:0 1 240px;min-width:120px')}>

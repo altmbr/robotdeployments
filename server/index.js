@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { load, dataset, pool, addSubmission } = require('./db');
+const seo = require('./seo');
 
 const PORT = process.env.PORT || 3000;
 const WEB = path.join(__dirname, '..', 'web');
@@ -67,7 +68,12 @@ let cache = null; // { js, json, companies } rebuilt after load
 async function refresh() {
   const d = await dataset();
   const json = JSON.stringify(d);
-  cache = { json, js: `window.ROBOT_DATA = ${json};\n`, byName: Object.fromEntries([...d.companies, ...d.gone].map((r) => [r.company.toLowerCase(), r])) };
+  const S = seo.build(d);
+  const indexHtml = STATIC['/'].body.toString()
+    .replace('<div id="root"></div>', `<div id="root">${S.indexStatic}</div>`)
+    .replace('</head>', `<script type="application/ld+json">${JSON.stringify(S.indexJsonld).replace(/</g, '\\u003c')}</script>\n</head>`);
+  cache = { json, js: `window.ROBOT_DATA = ${json};\n`, seo: S, indexHtml,
+    byName: Object.fromEntries([...d.companies, ...d.gone].map((r) => [r.company.toLowerCase(), r])) };
 }
 
 const send = (res, code, type, body, extra = {}) => {
@@ -86,7 +92,14 @@ const server = http.createServer(async (req, res) => {
     if (p === '/healthz') return send(res, cache ? 200 : 503, 'text/plain', cache ? 'ok' : 'loading', { 'Cache-Control': 'no-store' });
     if (p === '/api/submissions') return req.method === 'POST' ? await submission(req, res) : send(res, 405, 'text/plain', 'method not allowed', { Allow: 'POST' });
     if (!cache) return send(res, 503, 'text/plain', 'loading', { 'Retry-After': '5' });
+    if (p === '/' || p === '/index.html') return send(res, 200, 'text/html; charset=utf-8', cache.indexHtml);
     if (STATIC[p]) return send(res, 200, STATIC[p].type, STATIC[p].body);
+    if (p === '/sitemap.xml') return send(res, 200, 'application/xml; charset=utf-8', cache.seo.sitemap);
+    if (p === '/companies' || p === '/companies/') return send(res, 200, 'text/html; charset=utf-8', cache.seo.hub);
+    if (p.startsWith('/companies/')) {
+      const html = cache.seo.company(decodeURIComponent(p.slice(11)).replace(/\/$/, ''));
+      return html ? send(res, 200, 'text/html; charset=utf-8', html) : send(res, 404, 'text/plain', 'not found');
+    }
     if (p === '/data.js') return send(res, 200, 'application/javascript; charset=utf-8', cache.js);
     if (p === '/api/data') return send(res, 200, 'application/json', cache.json);
     if (p.startsWith('/api/companies/')) {
