@@ -78,7 +78,11 @@ const send = (res, code, type, body, extra = {}) => {
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, 'http://x');
-    const p = url.pathname;
+    // Served at www.altmbr.com/robot-deployment-index (proxied by the personal site's next.config rewrite) and directly on Railway.
+    // Accept both: strip the optional base path.
+    const BASE = '/robot-deployment-index';
+    let p = url.pathname;
+    if (p === BASE) p = '/'; else if (p.startsWith(BASE + '/')) p = p.slice(BASE.length);
     if (p === '/healthz') return send(res, cache ? 200 : 503, 'text/plain', cache ? 'ok' : 'loading', { 'Cache-Control': 'no-store' });
     if (p === '/api/submissions') return req.method === 'POST' ? await submission(req, res) : send(res, 405, 'text/plain', 'method not allowed', { Allow: 'POST' });
     if (!cache) return send(res, 503, 'text/plain', 'loading', { 'Retry-After': '5' });

@@ -372,7 +372,7 @@
           name: b.name.trim(), email: b.email.trim(), hp: b.hp };
         this.subUp({ sending: true, err: '' });
         try {
-          const r = await fetch('/api/submissions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(rec) });
+          const r = await fetch('/robot-deployment-index/api/submissions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(rec) });
           if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'failed');
           try { if (rec.name || rec.email) localStorage.setItem('rdi-submitter', JSON.stringify({ name: rec.name, email: rec.email })); } catch (e) {}
           this.subUp({ done: true, sending: false, units: R.fmt(n) });
