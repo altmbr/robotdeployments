@@ -24,4 +24,4 @@ DATABASE_URL=postgres://... npm start     # loads public/data.json into Postgres
 ## Deploy
 Railway builds from `main` on every push (Railpack, `railway.json`). Postgres connection via `DATABASE_URL`.
 
-Live: https://web-production-eb952.up.railway.app
+Live: https://robotdeploymentindex.up.railway.app
