@@ -30,7 +30,7 @@
     return CC.get(key);
   };
   const H = pseudo('hover'), F = pseudo('focus');
-  sheet.appendChild(document.createTextNode('.rdi-grp .rdi-x{opacity:0;transition:opacity .12s}.rdi-grp:hover .rdi-x,.rdi-x:focus-visible{opacity:1}.rdi-x:hover{background:#e9e8e4 !important;color:#0b0b0b !important}.rdi-tile:hover .rdi-x{opacity:1}@keyframes rdiflash{0%,60%{box-shadow:inset 0 0 0 3px #2a78d6}100%{box-shadow:inset 0 0 0 3px rgba(42,120,214,0)}}.rdi-flash{animation:rdiflash 1.6s ease-out}'));
+  sheet.appendChild(document.createTextNode('.rdi-grp .rdi-x{opacity:0;transition:opacity .12s}.rdi-grp:hover .rdi-x,.rdi-x:focus-visible{opacity:1}.rdi-x:hover{background:#e9e8e4 !important;color:#0b0b0b !important}.rdi-xz .rdi-x{opacity:0;transition:opacity .12s}.rdi-xz:hover .rdi-x{opacity:1}@keyframes rdiflash{0%,60%{box-shadow:inset 0 0 0 3px #2a78d6}100%{box-shadow:inset 0 0 0 3px rgba(42,120,214,0)}}.rdi-flash{animation:rdiflash 1.6s ease-out}'));
   const FONT = "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
 
   // ===================================================================== ResultsView (treemap + table)
@@ -145,8 +145,8 @@
               </div>
             </div>`)}
             ${v.tiles.map((t) => html`<div key=${'t' + t.key + (t.flash ? p_flash : '')} style=${t.style} className=${'rdi-tile' + (t.flash ? ' rdi-flash' : '')} onClick=${t.onClick} onMouseMove=${t.onMove} onMouseLeave=${this.hideTip}>
-              ${t.onHideCo && html`<button className="rdi-x" onClick=${t.onHideCo} title=${'Hide ' + t.name} aria-label=${'Hide ' + t.name}
-                style=${S('position:absolute;top:3px;right:3px;width:16px;height:16px;border:0;border-radius:999px;background:rgba(255,255,255,.88);color:#52514e;font:inherit;font-size:12px;line-height:16px;padding:0;cursor:pointer;z-index:3')}>×</button>`}
+              ${t.onHideCo && html`<div className="rdi-xz" style=${S('position:absolute;top:0;right:0;width:40px;height:34px;z-index:3')}><button className="rdi-x" onClick=${t.onHideCo} title=${'Hide ' + t.name} aria-label=${'Hide ' + t.name}
+                style=${S('position:absolute;top:3px;right:3px;width:16px;height:16px;border:0;border-radius:999px;background:rgba(255,255,255,.88);color:#52514e;font:inherit;font-size:12px;line-height:16px;padding:0;cursor:pointer')}>×</button></div>`}
               ${t.showName && html`<div style=${S('font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:15px')}>${t.name}</div>`}
               ${t.showUnits && html`<div style=${S('font-size:12px;opacity:.85;font-variant-numeric:tabular-nums;line-height:15px;margin-top:1px')}>${t.units}</div>`}
             </div>`)}
