@@ -34,6 +34,28 @@ async function submission(req, res) {
   const id = await addSubmission(x);
   console.log('submission', id, x.company, x.units);
   json(201, { ok: true });
+  notify(id, x).catch((e) => console.error('notify failed', id, e.message));  // never blocks or fails the submission
+}
+
+// Email the owner about each new submission via SendGrid. Config lives in Railway variables (never in git):
+// SENDGRID_API_KEY, NOTIFY_TO (recipient), NOTIFY_FROM (a SendGrid-verified sender). Missing config = no email.
+async function notify(id, x) {
+  const { SENDGRID_API_KEY: key, NOTIFY_TO: to, NOTIFY_FROM: from } = process.env;
+  if (!key || !to || !from) return;
+  const lines = [
+    `${x.existing ? 'Existing company' : 'NEW company'}: ${x.company}`,
+    `Robots: ${x.units.toLocaleString('en-US')}`,
+    `Source: ${x.source}`,
+    x.website ? `Website: ${x.website}` : null,
+    x.description ? `What they do: ${x.description}` : null,
+    `From: ${[x.name, x.email].filter(Boolean).join(' <') + (x.name && x.email ? '>' : '') || 'anonymous'}`,
+    '', `Submission #${id}. Verify the source before it goes into the index.`,
+  ].filter((l) => l !== null);
+  const body = { personalizations: [{ to: [{ email: to }] }], from: { email: from, name: 'Robot Deployment Index' },
+    subject: `New submission: ${x.company} (${x.units.toLocaleString('en-US')} robots)`, content: [{ type: 'text/plain', value: lines.join('\n') }] };
+  if (x.email) body.reply_to = { email: x.email, ...(x.name ? { name: x.name } : {}) };
+  const r = await fetch('https://api.sendgrid.com/v3/mail/send', { method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if (!r.ok) throw new Error(`sendgrid ${r.status} ${(await r.text()).slice(0, 200)}`);
 }
 let cache = null; // { js, json, companies } rebuilt after load
 
