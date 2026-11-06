@@ -1,0 +1,11 @@
+{
+ "_doc": "Reviewed public text that replaces internal fields in the public build (tools/publish.py). Keys: company -> {field: value}.",
+ "Aescape": {
+  "parent": null,
+  "life_evidence": "Still operating and taking bookings (aescape.com).",
+  "offering": "Autonomous AI robotic massage tables placed in gyms, hotels and spas"
+ },
+ "Mecka AI": {
+  "offering": "Robot training data (egocentric human video, RL) and deployment infrastructure for physical-AI labs"
+ }
+}

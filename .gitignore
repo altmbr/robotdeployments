@@ -1,0 +1,26 @@
+# WHITELIST: everything is ignored unless listed below. The research workspace (data/, research/, receipts/,
+# sources/, seeds/, private/) holds private-derived material and copies of third-party pages/transcripts.
+# Only the sanitized public build (public/data.json, made by tools/publish.py) is published. See CLAUDE.md.
+/*
+!/.gitignore
+!/README.md
+!/CLAUDE.md
+!/package.json
+!/package-lock.json
+!/railway.json
+!/server/
+!/public/
+!/viz/
+/viz/*
+!/viz/index.html
+!/tools/
+/tools/__pycache__/
+!/research/
+/research/*
+!/research/SCHEMA.md
+!/research/TAXONOMY.md
+node_modules/
+.DS_Store
+*.pyc
+*.bak
+/tools/verify_workflow.js

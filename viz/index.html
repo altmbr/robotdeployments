@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Robot Deployment Index</title>
+<script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+<script src="data.js"></script>
+<style>
+.viz-root {
+  color-scheme: light;
+  --surface-0: #f4f3f0; --surface-1: #fcfcfb; --surface-2: #ffffff;
+  --text-primary: #0b0b0b; --text-secondary: #52514e; --text-muted: #8a8984;
+  --hairline: #e3e2dd; --accent: #2a78d6; --other: #b9b8b2;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4; --s6:#008300; --s7:#6250d6; --s8:#e34948;
+  --c-high:#184f95; --c-med:#3987e5; --c-low:#86b6ef;
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) .viz-root {
+    color-scheme: dark;
+    --surface-0:#111110; --surface-1:#1a1a19; --surface-2:#222220;
+    --text-primary:#f0efec; --text-secondary:#c3c2b7; --text-muted:#8f8e86; --hairline:#33332f; --other:#5b5a55;
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767;
+    --c-high:#cde2fb; --c-med:#5598e7; --c-low:#184f95;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--surface-0); }
+.viz-root { font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif; color: var(--text-primary);
+  background: var(--surface-0); min-height: 100vh; padding: 24px 28px; }
+h1 { font-size: 22px; margin: 0 0 2px; letter-spacing: -0.01em; }
+.sub { color: var(--text-secondary); margin: 0 0 18px; font-size: 13px; }
+.filters { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; margin-bottom: 14px; }
+.fgroup { display: flex; align-items: center; gap: 6px; }
+.fgroup > span { font-size: 12px; color: var(--text-secondary); }
+.chip { border: 1px solid var(--hairline); background: var(--surface-2); color: var(--text-primary); border-radius: 999px;
+  padding: 4px 11px; font-size: 12.5px; cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--text-primary); color: var(--surface-1); border-color: var(--text-primary); }
+select, input[type=search] { border: 1px solid var(--hairline); background: var(--surface-2); color: var(--text-primary);
+  border-radius: 8px; padding: 5px 8px; font-size: 12.5px; }
+input[type=search] { width: 170px; }
+.kpis { display: grid; grid-template-columns: repeat(5, minmax(0,1fr)); gap: 10px; margin-bottom: 14px; }
+.kpi { background: var(--surface-1); border: 1px solid var(--hairline); border-radius: 10px; padding: 10px 14px; }
+.kpi .v { font-size: 22px; font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+.kpi .l { font-size: 12px; color: var(--text-secondary); }
+.main { display: grid; grid-template-columns: minmax(0,1fr) 340px; gap: 14px; }
+.card { background: var(--surface-1); border: 1px solid var(--hairline); border-radius: 12px; padding: 12px; }
+.crumbs { font-size: 13px; color: var(--text-secondary); margin: 0 0 8px; min-height: 20px; }
+.crumbs button { background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; font: inherit; }
+#tree { width: 100%; height: 640px; position: relative; }
+#tree svg { display: block; }
+.tile { cursor: pointer; }
+.tile rect { stroke: var(--surface-1); stroke-width: 2px; }
+.tile:hover rect, .tile:focus rect { filter: brightness(1.08); stroke: var(--text-primary); stroke-width: 1.5px; }
+.tile:focus { outline: none; }
+.grp-label { font-size: 12px; font-weight: 650; fill: var(--text-primary); pointer-events: none; }
+.grp-hit { fill: transparent; cursor: zoom-in; }
+.grp-band { fill: var(--surface-2); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 10px; font-size: 12px; color: var(--text-secondary); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.panel h2 { font-size: 16px; margin: 0 0 2px; }
+.panel .meta { color: var(--text-secondary); font-size: 12.5px; margin-bottom: 10px; }
+.panel .big { font-size: 28px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.claim { border-top: 1px solid var(--hairline); padding: 8px 0; font-size: 12.5px; }
+.claim .n { font-weight: 650; font-variant-numeric: tabular-nums; }
+.claim .q { color: var(--text-secondary); margin-top: 3px; }
+.claim a { color: var(--accent); word-break: break-all; }
+.empty { color: var(--text-muted); font-size: 13px; }
+.tip { position: fixed; pointer-events: none; background: var(--surface-2); border: 1px solid var(--hairline); border-radius: 8px;
+  padding: 8px 10px; font-size: 12.5px; box-shadow: 0 6px 24px rgba(0,0,0,.12); opacity: 0; transition: opacity .08s; max-width: 280px; z-index: 10; }
+.tip .tv { font-size: 16px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.tip .tn { color: var(--text-secondary); }
+table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--hairline); }
+th { color: var(--text-secondary); font-weight: 600; cursor: pointer; user-select: none; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.note { color: var(--text-muted); font-size: 12px; margin-top: 10px; }
+.strip { margin-top: 10px; font-size: 12.5px; color: var(--text-secondary); }
+.strip .chipx { display: inline-block; border: 1px solid var(--hairline); background: var(--surface-2); border-radius: 999px;
+  padding: 2px 9px; margin: 3px 4px 0 0; cursor: pointer; color: var(--text-primary); font-size: 12px; }
+.strip .chipx b { font-weight: 600; } .strip .chipx span { color: var(--text-muted); }
+.strip.gone .chipx { opacity: .75; text-decoration-color: var(--text-muted); } .strip.gone .chipx b { text-decoration: line-through; }
+#boards .chip.dim { opacity: .45; } #boards .allnote { font-size: 12px; color: var(--accent); margin-left: 6px; }
+.strip button.more { background: none; border: 0; color: var(--accent); cursor: pointer; font: inherit; padding: 0 0 0 4px; }
+.tags { margin: 6px 0 10px; } .tag { display: inline-block; font-size: 11.5px; border-radius: 6px; padding: 1px 7px; margin: 0 4px 4px 0;
+  background: var(--surface-2); border: 1px solid var(--hairline); color: var(--text-secondary); }
+.tag.p { color: var(--text-primary); border-color: var(--text-muted); }
+.sec { font-size: 12px; font-weight: 650; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); margin: 14px 0 2px; }
+.tl text { font-size: 10.5px; fill: var(--text-secondary); } .tl line { stroke: var(--hairline); }
+.panel { max-height: 900px; overflow: auto; }
+#tableWrap { display: none; max-height: 640px; overflow: auto; }
+@media (max-width: 1000px) { .main { grid-template-columns: 1fr; } .kpis { grid-template-columns: repeat(2, 1fr); } }
+</style>
+</head>
+<body>
+<div class="viz-root">
+  <h1>Robot Deployment Index</h1>
+  <p class="sub" id="sub"></p>
+
+  <div class="filters" role="group" aria-label="Filters">
+    <div class="fgroup" id="boards"><span>Board</span></div>
+    <div class="fgroup"><span>Vertical</span><select id="vertical"><option value="all">All</option></select></div>
+    <div class="fgroup"><span>Use case</span><select id="usecase"><option value="all">All</option></select></div>
+    <div class="fgroup"><span>Funding</span><select id="funding">
+      <option value="all">All companies</option><option value="12m">Raised in last 12 mo</option>
+      <option value="early">Pre-seed – Series A, last 12 mo</option><option value="mid">Series B+, last 12 mo</option></select></div>
+    <div class="fgroup"><span>Group by</span>
+      <select id="groupBy">
+        <option value="primary_vertical">Vertical → Company</option>
+        <option value="primary_use_case">Use case → Company</option>
+        <option value="primary_vertical,primary_use_case">Vertical → Use case → Company</option>
+        <option value="segment">Segment → Company</option>
+        <option value="hq">HQ country → Company</option>
+        <option value="segment,hq">Segment → Country → Company</option>
+        <option value="hq,segment">Country → Segment → Company</option>
+        <option value="none">Companies only</option>
+      </select></div>
+    <div class="fgroup"><span>Color by</span>
+      <select id="colorBy">
+        <option value="segment">Segment</option>
+        <option value="hq">HQ country</option>
+        <option value="confidence">Confidence</option>
+      </select></div>
+    <div class="fgroup"><span>Confidence</span>
+      <select id="conf"><option value="all">All</option><option value="hm">High + medium</option><option value="h">High only</option></select></div>
+    <div class="fgroup"><span>Country</span><select id="country"><option value="all">All</option></select></div>
+    <div class="fgroup"><button class="chip" id="exAmazon" aria-pressed="false">Exclude Amazon (captive)</button></div>
+    <div class="fgroup"><input type="search" id="q" placeholder="Search company…" aria-label="Search company"></div>
+    <div class="fgroup"><button class="chip" id="viewToggle" aria-pressed="false">Table view</button></div>
+  </div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="main">
+    <div class="card">
+      <div class="crumbs" id="crumbs"></div>
+      <div id="tree" aria-label="Treemap of robots shipped by company"></div>
+      <div id="uncounted" class="note"></div>
+      <div id="gone" class="note"></div>
+      <div id="tableWrap"><table id="tbl"><thead></thead><tbody></tbody></table></div>
+      <div class="legend" id="legend"></div>
+      <p class="note">Area = cumulative units shipped (best credible claim; fleet/installed counts are floors). Click a group to zoom in, a company for sources. Unverified interim data.</p>
+    </div>
+    <div class="card panel" id="panel"><p class="empty">Click a company to see its deployment and funding signals, with sources.</p></div>
+  </div>
+  <div class="tip" id="tip" role="tooltip"></div>
+</div>
+
+<script>
+const D = window.ROBOT_DATA.companies;
+const GONE = window.ROBOT_DATA.gone || [];
+const fmt = d3.format(',');
+const short = n => n >= 1e6 ? (n/1e6).toFixed(n >= 1e7 ? 0 : 1) + 'M' : n >= 1e3 ? Math.round(n/1e3) + 'K' : String(n);
+const BOARDS = [['autonomous','Autonomous'],['industrial','Industrial arms'],['healthcare','Healthcare'],['consumer','Consumer']];
+const COUNTRY = {US:'United States',CN:'China',JP:'Japan',DE:'Germany',NL:'Netherlands',NO:'Norway',CH:'Switzerland',DK:'Denmark',FR:'France',
+  GB:'United Kingdom',KR:'South Korea',IL:'Israel',IN:'India',CA:'Canada',SE:'Sweden',IT:'Italy',TW:'Taiwan',AU:'Australia',FI:'Finland',
+  SG:'Singapore',UA:'Ukraine',EE:'Estonia',ES:'Spain',AT:'Austria',NZ:'New Zealand','??':'Unknown'};
+const cname = c => COUNTRY[c] || c;
+const UCN = window.ROBOT_DATA.use_case_names || {}, VN = window.ROBOT_DATA.vertical_names || {};
+const EARLY = new Set(['pre_seed', 'seed', 'series_a']);
+const STAGE = s => ({pre_seed:'Pre-seed',seed:'Seed',series_a:'Series A',series_b:'Series B',series_c:'Series C',series_d_plus:'Series D+',
+  growth:'Growth',debt:'Debt',grant:'Grant',ipo:'IPO'})[s] || (s || '').replace(/_/g,' ');
+const money = n => n == null ? '' : '$' + (n >= 1e9 ? (n/1e9).toFixed(1) + 'B' : n >= 1e6 ? Math.round(n/1e6) + 'M' : Math.round(n/1e3) + 'K');
+D.forEach(d => { d.primary_vertical = d.primary_vertical || 'untagged'; d.primary_use_case = d.primary_use_case || 'untagged'; });
+
+const state = { boards: new Set(['autonomous']), groupBy: 'primary_vertical', colorBy: 'segment', conf: 'all', country: 'all',
+  exAmazon: false, q: '', zoom: [], vertical: 'all', usecase: 'all', funding: 'all', showAllNone: false, table: false, sortKey: 'units', sortDir: -1 };
+
+// Fixed color assignment: color follows the entity (ranked once on the FULL dataset), never the filtered rank.
+const css = getComputedStyle(document.querySelector('.viz-root'));
+const slot = i => `var(--s${i+1})`;
+function fixedOrder(key) {
+  const t = d3.rollups(D, v => d3.sum(v, d => d.units), d => d[key]).sort((a,b) => b[1]-a[1]).map(d => d[0]);
+  return new Map(t.slice(0, 7).map((k,i) => [k, slot(i)]));
+}
+// Segment colors pinned by hand (validated slot order): the categories the story is about stay colored on every view.
+const SEG_COLORS = new Map([['warehouse_logistics', slot(0)], ['agriculture', slot(1)], ['service_cleaning_hospitality', slot(2)],
+  ['robotaxi_av', slot(3)], ['humanoid', slot(4)], ['security_defense', slot(5)], ['last_mile_delivery', slot(6)], ['industrial_arms_cobots', slot(7)]]);
+const COLORS = { segment: SEG_COLORS, hq: fixedOrder('hq'),
+  confidence: new Map([['high','var(--c-high)'],['med','var(--c-med)'],['medium','var(--c-med)'],['low','var(--c-low)']]) };
+const colorOf = d => COLORS[state.colorBy].get(state.colorBy === 'segment' ? d.segment : state.colorBy === 'hq' ? d.hq : d.confidence) || 'var(--other)';
+const labelOf = (key, v) => v === 'untagged' ? 'Not yet tagged' : key === 'primary_vertical' ? (VN[v] || v) : key === 'primary_use_case' ? (UCN[v] || v) : key === 'hq' ? cname(v) : key === 'segment' ? (D.find(d => d.segment === v) || {}).segment_label || v : v;
+
+// Board chips
+const bwrap = d3.select('#boards');
+BOARDS.forEach(([k, l]) => bwrap.append('button').attr('class','chip').attr('aria-pressed', state.boards.has(k)).text(l)
+  .on('click', function() { state.boards.has(k) ? state.boards.delete(k) : state.boards.add(k);
+    if (!state.boards.size) state.boards.add(k); d3.select(this).attr('aria-pressed', state.boards.has(k)); state.zoom = []; render(); }));
+// Country select (ranked by total)
+d3.rollups(D, v => d3.sum(v, d => d.units), d => d.hq).sort((a,b) => b[1]-a[1])
+  .forEach(([c]) => d3.select('#country').append('option').attr('value', c).text(cname(c)));
+// Vertical / use-case selects list only tags present in the data, by total robots
+[['#vertical', 'verticals', VN, 'vertical'], ['#usecase', 'use_cases', UCN, 'usecase']].forEach(([sel, key, names, st]) => {
+  const tot = new Map(); D.forEach(d => d[key].forEach(t => tot.set(t, (tot.get(t) || 0) + d.units + 1)));
+  [...tot].sort((a, b) => b[1] - a[1]).forEach(([t]) => d3.select(sel).append('option').attr('value', t).text(names[t] || t));
+  d3.select(sel).on('change', e => { state[st] = e.target.value; state.zoom = []; render(); });
+});
+d3.select('#funding').on('change', e => { state.funding = e.target.value; state.zoom = []; render(); });
+// Keep every control showing the state that's actually drawn (the select used to show Vertical while the map grouped by segment).
+d3.select('#groupBy').property('value', state.groupBy);
+d3.select('#groupBy').on('change', e => { state.groupBy = e.target.value; state.zoom = []; render(); });
+d3.select('#colorBy').on('change', e => { state.colorBy = e.target.value; render(); });
+d3.select('#conf').on('change', e => { state.conf = e.target.value; render(); });
+d3.select('#country').on('change', e => { state.country = e.target.value; state.zoom = []; render(); });
+d3.select('#q').on('input', e => { state.q = e.target.value.toLowerCase(); render(); });
+d3.select('#exAmazon').on('click', function() { state.exAmazon = !state.exAmazon; d3.select(this).attr('aria-pressed', state.exAmazon); render(); });
+d3.select('#viewToggle').on('click', function() { state.table = !state.table; d3.select(this).attr('aria-pressed', state.table);
+  d3.select('#tree').style('display', state.table ? 'none' : null); d3.select('#tableWrap').style('display', state.table ? 'block' : 'none'); render(); });
+
+function filtered(src = D) {
+  // Search and market filters look across every board: a founder filtering "manufacturing" or "funded last 12 mo"
+  // should see AI-native arm startups (Tutor, Standard Bots) that live on the Industrial board.
+  const anyBoard = state.q || state.vertical !== 'all' || state.usecase !== 'all' || state.funding !== 'all';
+  return src.filter(d => (src === GONE || anyBoard || state.boards.has(d.board))
+    && (state.conf === 'all' || (state.conf === 'h' ? d.confidence === 'high' : d.confidence !== 'low'))
+    && (state.country === 'all' || d.hq === state.country)
+    && (state.vertical === 'all' || d.verticals.includes(state.vertical))
+    && (state.usecase === 'all' || d.use_cases.includes(state.usecase))
+    && (state.funding === 'all' || (d.funded_12m && (state.funding === '12m'
+         || (state.funding === 'early' ? EARLY.has(d.stage_12m) : !EARLY.has(d.stage_12m)))))
+    && !(state.exAmazon && d.company === 'Amazon Robotics')
+    && (!state.q || d.company.toLowerCase().includes(state.q)));
+}
+
+function kpis(rows, nNone = 0, all = rows) {
+  const funded = all.filter(d => d.funded_12m);
+  const tot = d3.sum(rows, d => d.units);
+  const by = c => d3.sum(rows.filter(d => d.hq === c), d => d.units);
+  const lead = rows.slice().sort((a,b) => b.units - a.units)[0];
+  const k = [
+    [short(tot), 'units shipped'],
+    [rows.length, nNone ? `companies counted · ${nNone} tracked w/o count` : 'companies counted'],
+    [tot ? Math.round(100*by('CN')/tot) + '%' : '–', 'China-HQ share'],
+    [funded.length, `raised in last 12 mo · ${money(d3.sum(funded, d => d.raised_12m || 0)) || '$0'}`],
+    [lead ? lead.company : '–', lead ? 'leader · ' + short(lead.units) : 'leader'],
+  ];
+  const sel = d3.select('#kpis').selectAll('.kpi').data(k).join(enter => { const e = enter.append('div').attr('class','kpi');
+    e.append('div').attr('class','v'); e.append('div').attr('class','l'); return e; });
+  sel.select('.v').text(d => d[0]); sel.select('.l').text(d => d[1]);
+}
+
+function crumbs() {
+  const c = d3.select('#crumbs').html('');
+  c.append('button').text('All').on('click', () => { state.zoom = []; render(); });
+  const keys = state.groupBy === 'none' ? [] : state.groupBy.split(',');
+  state.zoom.forEach((z, i) => { c.append('span').text(' / ');
+    c.append('button').text(labelOf(keys[i], z)).on('click', () => { state.zoom = state.zoom.slice(0, i+1); render(); }); });
+}
+
+const tip = d3.select('#tip');
+function showTip(ev, d) {
+  tip.html(''); tip.append('div').attr('class','tv').text(fmt(d.units) + ' units');
+  tip.append('div').text(d.company);
+  tip.append('div').attr('class','tn').text(`${d.segment_label} · ${cname(d.hq)} · ${d.metric.replace(/_/g,' ')} · ${d.as_of || 'n.d.'} · ${d.confidence} confidence`);
+  if (d.rounds && d.rounds.length) tip.append('div').attr('class','tn').text(`Last round: ${STAGE(d.rounds[0].stage)} ${money(d.rounds[0].amount)} · ${d.rounds[0].date}`);
+  tip.style('opacity', 1); moveTip(ev);
+}
+function moveTip(ev) { const w = 290; tip.style('left', Math.min(ev.clientX + 14, innerWidth - w) + 'px').style('top', (ev.clientY + 14) + 'px'); }
+const hideTip = () => tip.style('opacity', 0);
+
+function textFor(fill) { // pick readable ink against the tile fill
+  const probe = document.createElement('span'); probe.style.color = fill; document.body.appendChild(probe);
+  const rgb = getComputedStyle(probe).color.match(/\d+/g).map(Number); probe.remove();
+  const L = c => { c /= 255; return c <= .03928 ? c/12.92 : ((c+.055)/1.055)**2.4; };
+  const lum = .2126*L(rgb[0]) + .7152*L(rgb[1]) + .0722*L(rgb[2]);
+  return lum > 0.36 ? '#0b0b0b' : '#ffffff';
+}
+
+function renderTree(rows) {
+  const el = document.getElementById('tree'); const W = el.clientWidth, H = el.clientHeight;
+  d3.select(el).selectAll('*').remove();
+  const keys = state.groupBy === 'none' ? [] : state.groupBy.split(',');
+  let data = rows;
+  state.zoom.forEach((z, i) => { data = data.filter(d => d[keys[i]] === z); });
+  const rest = keys.slice(state.zoom.length);
+  const groupFns = rest.map(k => d => d[k]);
+  // Zoomed all the way in (or Group by: none) leaves no grouping keys: d3.group() then returns a plain array, which
+  // d3.hierarchy() treats as a single childless node -> blank map. Wrap it as a Map so companies become leaves.
+  const grouped = groupFns.length ? d3.group(data, ...groupFns) : new Map([['', data]]);
+  const root = d3.hierarchy(grouped).sum(d => d.units || 0).sort((a,b) => b.value - a.value);
+  d3.treemap().size([W, H]).paddingInner(2).paddingOuter(rest.length ? 3 : 0)
+    .paddingTop(n => rest.length && n.depth > 0 && n.children ? 20 : 0).round(true)(root);
+  const svg = d3.select(el).append('svg').attr('width', W).attr('height', H).attr('role','img');
+  // group headers (click to zoom)
+  if (rest.length) {
+    const groups = root.descendants().filter(n => n.depth > 0 && n.children);
+    const g = svg.selectAll('g.grp').data(groups).join('g').attr('class','grp');
+    g.append('rect').attr('class','grp-band').attr('x', n => n.x0).attr('y', n => n.y0).attr('width', n => n.x1-n.x0).attr('height', n => n.y1-n.y0).attr('rx', 6);
+    g.append('rect').attr('class','grp-hit').attr('x', n => n.x0).attr('y', n => n.y0).attr('width', n => n.x1-n.x0).attr('height', 20)
+      .on('click', (ev, n) => { const path = n.ancestors().reverse().slice(1).map(a => a.data[0]); state.zoom = state.zoom.concat(path); render(); })
+      .append('title').text('Zoom in');
+    g.append('text').attr('class','grp-label').attr('x', n => n.x0 + 6).attr('y', n => n.y0 + 14)
+      .text(n => { const lab = `${labelOf(rest[n.depth-1], n.data[0])} · ${short(n.value)}`; const max = (n.x1-n.x0-10)/6.6; return lab.length > max ? lab.slice(0, Math.max(0, max-1)) + (max > 3 ? '…' : '') : lab; });
+  }
+  const leaves = root.leaves().filter(l => l.data && l.data.company);
+  const t = svg.selectAll('g.tile').data(leaves).join('g').attr('class','tile').attr('tabindex', 0)
+    .attr('transform', l => `translate(${l.x0},${l.y0})`)
+    .on('pointermove', (ev, l) => showTip(ev, l.data)).on('pointerleave', hideTip)
+    .on('focus', (ev, l) => { const r = ev.target.getBoundingClientRect(); showTip({clientX: r.x + 10, clientY: r.y + 10}, l.data); })
+    .on('blur', hideTip).on('click', (ev, l) => panel(l.data))
+    .on('keydown', (ev, l) => { if (ev.key === 'Enter') panel(l.data); });
+  t.append('rect').attr('width', l => Math.max(0, l.x1-l.x0)).attr('height', l => Math.max(0, l.y1-l.y0)).attr('rx', 4)
+    .attr('fill', l => colorOf(l.data));
+  t.each(function(l) {
+    const w = l.x1-l.x0, h = l.y1-l.y0; if (w < 46 || h < 24) return;
+    const ink = textFor(colorOf(l.data)); const g = d3.select(this);
+    const name = l.data.company; const max = Math.floor((w-10)/6.8);
+    g.append('text').attr('x', 6).attr('y', 15).attr('fill', ink).style('font-size','12px').style('font-weight', 600).style('pointer-events','none')
+      .text(name.length > max ? name.slice(0, Math.max(1,max-1)) + '…' : name);
+    if (h > 38) g.append('text').attr('x', 6).attr('y', 31).attr('fill', ink).style('font-size','12px').style('opacity', .85)
+      .style('font-variant-numeric','tabular-nums').style('pointer-events','none').text(short(l.data.units));
+  });
+}
+
+function renderTable(rows) {
+  const cols = [['company','Company'],['segment_label','Segment'],['hq','HQ'],['units','Units shipped',1],['metric','Basis'],['as_of','As of'],['primary_vertical','Vertical'],['last_round','Last round'],['raised_12m','Raised 12 mo',1],['confidence','Confidence']];
+  const th = d3.select('#tbl thead').html('').append('tr');
+  cols.forEach(([k, l, num]) => th.append('th').attr('class', num ? 'num' : null).text(l + (state.sortKey === k ? (state.sortDir < 0 ? ' ↓' : ' ↑') : ''))
+    .on('click', () => { state.sortDir = state.sortKey === k ? -state.sortDir : -1; state.sortKey = k; render(); }));
+  const s = rows.slice().sort((a,b) => d3.ascending(a[state.sortKey], b[state.sortKey]) * -state.sortDir * -1);
+  const tr = d3.select('#tbl tbody').selectAll('tr').data(s).join('tr').style('cursor','pointer').on('click', (ev, d) => panel(d));
+  tr.selectAll('td').data(d => cols.map(([k,,num]) => [k === 'last_round' ? (d.rounds && d.rounds[0] ? `${STAGE(d.rounds[0].stage)} · ${d.rounds[0].date}` : '') : k === 'raised_12m' ? money(d.raised_12m) : k === 'primary_vertical' ? labelOf(k, d[k]) : k === 'units' ? (d.units ? fmt(d.units) : '—') : k === 'hq' ? cname(d.hq) : (d[k] || '').toString().replace(/_/g,' '), num]))
+    .join('td').attr('class', d => d[1] ? 'num' : null).text(d => d[0]);
+}
+
+function legend() {
+  const lg = d3.select('#legend').html('');
+  const m = COLORS[state.colorBy];
+  const name = k => state.colorBy === 'hq' ? cname(k) : state.colorBy === 'segment' ? labelOf('segment', k) : k + ' confidence';
+  [...m.entries()].filter(([k]) => k !== 'medium').forEach(([k, c]) => { const s = lg.append('span'); s.append('i').style('background', c); s.append('span').text(name(k)); });
+  if (state.colorBy !== 'confidence') { const s = lg.append('span'); s.append('i').style('background','var(--other)'); s.append('span').text('Other'); }
+}
+
+function panel(d) {
+  const p = d3.select('#panel').html('');
+  p.append('h2').text(d.company);
+  p.append('div').attr('class','meta').text([cname(d.hq), d.status && d.status !== 'private' ? d.status.replace(/_/g,' ') + (d.parent ? ' of ' + d.parent : '') : '',
+    d.website ? d.website.replace(/^https?:\/\/(www\.)?/,'').replace(/\/$/,'') : ''].filter(Boolean).join(' · '));
+  if (d.offering) p.append('div').style('font-size','13px').style('margin-bottom','6px').text(d.offering);
+  if (d.lifecycle === 'shut_down' || d.lifecycle === 'exited_robots') {
+    const w = p.append('div').attr('class','q').style('margin','4px 0 8px');
+    w.append('b').text((d.lifecycle === 'shut_down' ? 'Shut down' : 'Exited robots') + (d.ended ? ' ' + d.ended : '') + '. ');
+    w.append('span').text(d.life_evidence || '');
+    if (d.life_url && /^https?:/.test(d.life_url)) w.append('div').append('a').attr('href', d.life_url).attr('target','_blank').attr('rel','noopener').text(d.life_url.replace(/^https?:\/\//,'').slice(0, 70));
+  }
+  const tg = p.append('div').attr('class','tags');
+  d.use_cases.forEach(u => tg.append('span').attr('class', 'tag' + (u === d.primary_use_case ? ' p' : '')).text(UCN[u] || u));
+  d.verticals.forEach(v => tg.append('span').attr('class', 'tag' + (v === d.primary_vertical ? ' p' : '')).text('→ ' + (VN[v] || v)));
+
+  // headline numbers
+  const hl = p.append('div').style('display','flex').style('gap','22px');
+  const h1 = hl.append('div'); h1.append('div').attr('class','big').text(d.units ? fmt(d.units) : '—');
+  h1.append('div').attr('class','meta').text(d.units ? `robots · ${d.metric.replace(/_/g,' ')} · ${d.as_of || 'n.d.'}` : 'no public robot count yet');
+  if (d.total_raised || d.raised_12m) { const h2 = hl.append('div'); h2.append('div').attr('class','big').text(money(d.total_raised || d.raised_12m));
+    h2.append('div').attr('class','meta').text(d.total_raised ? 'raised to date' : 'raised in last 12 mo'); }
+  if (d.orders) p.append('div').attr('class','meta').text(`Orders/backlog on record: ${fmt(d.orders)} (not counted as shipped)`);
+
+  // timeline: funding rounds (diamonds, above) + deployment claims (dots, below)
+  const ev = [...(d.rounds || []).map(r => ({k:'f', t: r.date, lab: `${STAGE(r.stage)}${r.amount ? ' ' + money(r.amount) : ''}`})),
+              ...d.claims.filter(c => c.count != null && c.as_of).map(c => ({k:'d', t: String(c.as_of), lab: short(c.count)}))]
+    .map(e => ({...e, x: new Date(e.t.length === 4 ? e.t + '-06' : e.t.slice(0, 10))})).filter(e => !isNaN(e.x));
+  if (ev.length > 1) {
+    p.append('div').attr('class','sec').text('Timeline');
+    const W = 310, H = 74, sx = d3.scaleTime().domain(d3.extent(ev, e => e.x)).nice().range([12, W - 12]);
+    const g = p.append('svg').attr('class','tl').attr('width', W).attr('height', H).attr('role','img')
+      .attr('aria-label','Funding rounds above the line, deployment counts below');
+    g.append('line').attr('x1', 4).attr('x2', W - 4).attr('y1', H/2).attr('y2', H/2);
+    sx.ticks(4).forEach(t => g.append('text').attr('x', sx(t)).attr('y', H/2 + 3).attr('text-anchor','middle')
+      .style('fill','var(--text-muted)').style('paint-order','stroke').style('stroke','var(--surface-1)').style('stroke-width',3).text(d3.timeFormat('%Y')(t)));
+    ev.forEach((e, i) => { const y = e.k === 'f' ? H/2 - 14 : H/2 + 14, x = sx(e.x);
+      if (e.k === 'f') g.append('path').attr('d', d3.symbol(d3.symbolDiamond, 48)()).attr('transform', `translate(${x},${y})`).attr('fill','var(--s2)');
+      else g.append('circle').attr('cx', x).attr('cy', y).attr('r', 4).attr('fill','var(--s1)');
+      g.append('text').attr('x', x).attr('y', e.k === 'f' ? y - 8 : y + 15).attr('text-anchor','middle').text(i % 2 && ev.length > 6 ? '' : e.lab); });
+    const lg = p.append('div').attr('class','meta');
+    lg.append('span').style('color','var(--s2)').text('◆'); lg.append('span').text(' funding   ');
+    lg.append('span').style('color','var(--s1)').text('●'); lg.append('span').text(' deployment claims');
+  }
+
+  const sources = (box, url) => { if (url && /^https?:/.test(url)) box.append('div').append('a').attr('href', url).attr('target','_blank').attr('rel','noopener').text(url.replace(/^https?:\/\//,'').slice(0, 70));
+    else if (url) box.append('div').attr('class','q').text(url.slice(0, 90)); };
+  p.append('div').attr('class','sec').text(`Deployment signals (${d.claims.length})`);
+  if (!d.claims.length) p.append('div').attr('class','empty').text('None found yet.');
+  d.claims.forEach(c => { const e = p.append('div').attr('class','claim');
+    e.append('span').attr('class','n').text(c.count != null ? fmt(c.count) : 'no number');
+    e.append('span').text(` · ${(c.metric || '').replace(/_/g,' ')} · ${c.as_of || 'n.d.'} · ${c.type || ''} · ${c.conf || ''}`);
+    if (c.quote) e.append('div').attr('class','q').text('“' + c.quote + '”'); sources(e, c.url); });
+  p.append('div').attr('class','sec').text(`Funding signals (${(d.rounds || []).length})`);
+  if (!(d.rounds || []).length) p.append('div').attr('class','empty').text(d.status === 'public' ? 'Public company.' : d.status === 'corporate_division' ? 'Division of ' + (d.parent || 'a larger company') + '.' : 'None sourced yet.');
+  (d.rounds || []).forEach(r => { const e = p.append('div').attr('class','claim');
+    e.append('span').attr('class','n').text(`${STAGE(r.stage)}${r.amount ? ' · ' + money(r.amount) : ''}`);
+    e.append('span').text(` · ${r.date}${r.leads && r.leads.length ? ' · led by ' + r.leads.join(', ') : ''}`);
+    if (r.quote) e.append('div').attr('class','q').text('“' + r.quote + '”'); sources(e, r.url); });
+}
+
+function render() {
+  // The "no count yet" strip follows the map's zoom too (clicking Construction shows Construction's uncounted companies).
+  const zkeys = state.groupBy === 'none' ? [] : state.groupBy.split(',');
+  const inZoom = d => state.zoom.every((z, i) => d[zkeys[i]] === z);
+  const all = filtered(), rows = all.filter(d => d.units > 0), none = all.filter(d => !d.units && inZoom(d));
+  // When search or a market filter is on, the map spans every board: say so on the Board chips instead of
+  // leaving "Autonomous" lit (an Industrial-board company was hard to find for this reason).
+  const spanAll = state.q || state.vertical !== 'all' || state.usecase !== 'all' || state.funding !== 'all';
+  d3.selectAll('#boards .chip').classed('dim', spanAll);
+  d3.select('#boards').select('.allnote').remove();
+  if (spanAll) d3.select('#boards').append('span').attr('class', 'allnote').text('all boards (filter on)');
+  kpis(rows, none.length, all); crumbs(); legend();
+  if (state.table) renderTable(all); else renderTree(rows);
+  // Tracked-but-uncounted companies can't take treemap area; list them when searching so nobody looks "missing".
+  const u = d3.select('#uncounted').html('');
+  if (!state.table && none.length) {
+    u.attr('class', 'strip');
+    u.append('span').text(`Tracked, no public robot count yet (${none.length}): `);
+    const srt = none.slice().sort((a, b) => (b.raised_12m || 0) - (a.raised_12m || 0) || (b.total_raised || 0) - (a.total_raised || 0));
+    srt.slice(0, (state.showAllNone || state.q) ? 400 : 24).forEach(d => {
+      const c = u.append('span').attr('class', 'chipx').attr('tabindex', 0).on('click', () => panel(d))
+        .on('keydown', ev => { if (ev.key === 'Enter') panel(d); });
+      c.append('b').text(d.company);
+      const extra = d.funded_12m ? ` · ${STAGE(d.stage_12m)} ${money(d.raised_12m)}` : d.orders ? ` · ${short(d.orders)} on order` : '';
+      if (extra) c.append('span').text(extra);
+    });
+    if (none.length > 24) u.append('button').attr('class', 'more').text(state.showAllNone ? 'show fewer' : `show all ${none.length}`)
+      .on('click', () => { state.showAllNone = !state.showAllNone; render(); });
+  }
+  // Shut down or exited robots: off the live map and totals, kept as a record (peak shipped, when, why, source).
+  const g = d3.select('#gone').html(''), gl = state.table ? [] : filtered(GONE);
+  if (gl.length) {
+    g.attr('class', 'strip gone');
+    g.append('span').text(`Shut down / exited robots, not in totals (${gl.length}): `);
+    gl.slice().sort((a, b) => (b.units || 0) - (a.units || 0)).slice(0, state.showAllGone || state.q ? 400 : 16).forEach(d => {
+      const c = g.append('span').attr('class', 'chipx').attr('tabindex', 0).attr('title', d.life_evidence || '')
+        .on('click', () => panel(d)).on('keydown', ev => { if (ev.key === 'Enter') panel(d); });
+      c.append('b').text(d.company);
+      c.append('span').text(` · ${d.lifecycle === 'exited_robots' ? 'exited robots' : 'shut down'}${d.ended ? ' ' + d.ended : ''}${d.units ? ' · peak ' + short(d.units) : ''}`);
+    });
+    if (gl.length > 16) g.append('button').attr('class', 'more').text(state.showAllGone ? 'show fewer' : `show all ${gl.length}`)
+      .on('click', () => { state.showAllGone = !state.showAllGone; render(); });
+  }
+}
+d3.select('#sub').text(`Cumulative robots shipped, by company · ${D.length} companies · ${fmt(window.ROBOT_DATA.n_claims)} sourced claims · built ${window.ROBOT_DATA.built} · interim, unverified`);
+addEventListener('resize', () => { if (!state.table) render(); });
+render();
+</script>
+</body>
+</html>
