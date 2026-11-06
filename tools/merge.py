@@ -44,9 +44,13 @@ EXCLUDE_DEF = {  # fail the robot test or defunct (owner's robot test, 2026-11-0
     'cruise': 'defunct (shut down 2024)',
     'halter': 'GPS cow collars (sound/vibration cues) - wearable, not a robot',
 }
+DEFENSE_DRONES = {'tealdrones', 'tealdronesredcat', 'firestormlabs', 'draganfly'}
 def board(c):
     seg = c.get('segment') or ''
     if seg == 'consumer_home': return 'consumer'
+    # Robot test: piloted camera/hobby drones (a human flies them) fail "autonomous" -> Consumer board (owner, 2026-11-06).
+    # Piloted defense systems (FPV strike drones, UGVs) are NOT moved here; they await a case-by-case review.
+    if c.get('autonomy') == 'piloted' and seg == 'drones': return 'consumer'
     # An arm is "industrial" only when it's a fixed-program factory arm. AI-driven arms in warehouses
     # (Pickle, Dexterity, Ambi, Covariant...) perceive and decide per item -> autonomous board.
     if seg == 'industrial_arms_cobots' or (c.get('form_factor') == 'arm_industrial' and seg in ('', 'other')): return 'industrial'
@@ -119,6 +123,8 @@ for k, cs in by_co.items():
             if g.get('count'): geo[r] += num(g['count']) or 0
             elif g.get('share') is not None and num(g.get('share')) is not None: geo[r] += best['count'] * num(g['share'])
     brd = board(base)
+    # military drone makers stay off Consumer even when a claim is tagged piloted+drones
+    if brd == 'consumer' and (any(c.get('segment') == 'security_defense' for c in cs) or k in DEFENSE_DRONES): brd = 'autonomous'
     if AGG_RE.search(display): brd = 'aggregate'
     elif k in EXCLUDE_DEF: brd = 'excluded'
     rows.append({

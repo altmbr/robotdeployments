@@ -37,13 +37,17 @@ for f in sorted(glob.glob(f'{ROOT}/private/verdicts/*.jsonl')):
     for l in open(f):
         try: v = json.loads(l); V[v['source']] = v
         except Exception: pass
-DROP_LINES = set()  # not line-addressable here; drop_lines resolved via source+quote below
+# drop_lines in verdicts refer to line numbers of data/claims.jsonl AT TRIAGE TIME (snapshot: private/sources_to_classify.json).
+# Line numbers shift whenever claims are added, so resolve them to claim content once and match on (company, count, metric).
+SNAP = {}
+for it in json.load(open(f'{ROOT}/private/sources_to_classify.json')):
+    for c in it.get('claims', []): SNAP[c['line']] = c
+DROP_KEYS = set()
 for v in V.values():
-    for ln in v.get('drop_lines') or []: DROP_LINES.add(ln)
-LINE = {}
-for i, l in enumerate(open(f'{ROOT}/data/claims.jsonl')):
-    x = json.loads(l)
-    if x.get('count'): LINE.setdefault(key(x['company'], x['count'], x.get('metric'), x.get('as_of'), x.get('quote')), i)
+    for ln in v.get('drop_lines') or []:
+        c = SNAP.get(ln)
+        if not c: print('ABORT: drop_line', ln, 'not in triage snapshot'); sys.exit(1)
+        DROP_KEYS.add((c['company'], float(c['count']), c.get('metric')))
 
 FIX = {}
 for f in sorted(glob.glob(f'{ROOT}/private/review/*.jsonl')):
@@ -69,7 +73,7 @@ def clean_claim(co, c):
         stats['kept_public'] += 1; return out
     v = V.get(orig)
     if not v: stats['dropped_unclassified'] += 1; return None
-    if v['verdict'] == 'drop_confidential' or LINE.get(k) in DROP_LINES: stats['dropped_confidential'] += 1; return None
+    if v['verdict'] == 'drop_confidential' or (co, float(c['count']), c.get('metric')) in DROP_KEYS: stats['dropped_confidential'] += 1; return None
     if v['verdict'] == 'public_original' and is_http(v.get('public_url')):
         out.update(type='web', url=v['public_url'], quote=(c.get('quote') or '')[:300] or None); stats['public_original'] += 1; return out
     out.update(type='proprietary', url=None, quote=None, source='Proprietary research'); stats['proprietary'] += 1; return out

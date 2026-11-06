@@ -29,7 +29,14 @@ CREATE TABLE IF NOT EXISTS rounds (
   stage text, date text, amount double precision, leads jsonb, url text, quote text
 );
 CREATE INDEX IF NOT EXISTS claims_company ON claims(company);
-CREATE INDEX IF NOT EXISTS rounds_company ON rounds(company);`;
+CREATE INDEX IF NOT EXISTS rounds_company ON rounds(company);
+-- visitor submissions (Submit a company). PRIVATE: never served by the API, never auto-published;
+-- each one is verified through the research pipeline before any number reaches public/data.json.
+CREATE TABLE IF NOT EXISTS submissions (
+  id serial PRIMARY KEY, created_at timestamptz NOT NULL DEFAULT now(), company text NOT NULL, existing boolean NOT NULL,
+  units bigint NOT NULL, source text NOT NULL, website text, description text, name text, email text, ip_hash text, user_agent text,
+  status text NOT NULL DEFAULT 'new'
+);`;
 
 async function load() {
   const raw = fs.readFileSync(DATA);
@@ -96,4 +103,11 @@ async function dataset() {
   return out;
 }
 
-module.exports = { pool, load, dataset };
+async function addSubmission(x) {  // table created by load() at boot (SCHEMA runs before the hash check)
+  const r = await pool.query(
+    'INSERT INTO submissions (company,existing,units,source,website,description,name,email,ip_hash,user_agent) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id',
+    [x.company, x.existing, x.units, x.source, x.website, x.description, x.name, x.email, x.ip_hash, x.user_agent]);
+  return r.rows[0].id;
+}
+
+module.exports = { addSubmission, pool, load, dataset };

@@ -9,7 +9,7 @@ The repo is PUBLIC and the site is public. The research workspace in this folder
 numbers mined from the owner's private files (research memos, investment and career folders, decks, emails,
 meeting notes). Only the sanitized build ever leaves this machine.
 
-- **What ships:** code (`server/`, `tools/`, `viz/index.html`), docs (`research/SCHEMA.md`, `research/TAXONOMY.md`),
+- **What ships:** code (`server/`, `web/` (the public site), `tools/`, `viz/index.html` (internal viewer)), docs (`research/SCHEMA.md`, `research/TAXONOMY.md`),
   and `public/data.json`. `.gitignore` is a WHITELIST; never loosen it with a broad `!` rule.
 - **What never ships:** `data/`, `research/` (except the two docs), `receipts/` (full copies of third-party pages and
   podcast transcripts: copyright), `sources/`, `seeds/`, `private/`, `viz/data.js` (internal, unsanitized).
@@ -36,7 +36,13 @@ meeting notes). Only the sanitized build ever leaves this machine.
 ## Pipeline (local)
 `tools/merge.py` (research/claims → data/) → `tools/build_viz.py` (→ viz/data.js, internal) → `tools/publish.py`
 (→ public/data.json) → `git push` → Railway rebuilds; on boot the server loads public/data.json into Postgres
-(skipped if unchanged) and serves the treemap + `/api/data`, `/api/companies/<name>`.
+(skipped if unchanged) and serves the site (`web/`, a port of the Claude Design project "Robot Index") + `/api/data`,
+`/api/companies/<name>`, and `POST /api/submissions`.
+
+## Visitor submissions ("Submit a company")
+Stored in the Postgres `submissions` table on Railway (name/email are personal data: never published, never in git,
+never served by the API). A submission is a LEAD, not a claim: verify it through the normal research pipeline
+(fetch the source, confirm the number) before anything reaches `public/data.json`.
 
 ## Data model
 See research/SCHEMA.md (claims, metrics, autonomy/robot test, receipts) and research/TAXONOMY.md (use cases, verticals).

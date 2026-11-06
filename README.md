@@ -19,6 +19,7 @@ DATABASE_URL=postgres://... npm start     # loads public/data.json into Postgres
 ## API
 - `GET /api/data` — full dataset (companies, claims, funding rounds)
 - `GET /api/companies/<name>` — one company
+- `POST /api/submissions` — submit a robot count (company, units, source); reviewed before it appears
 
 ## Deploy
 Railway builds from `main` on every push (Railpack, `railway.json`). Postgres connection via `DATABASE_URL`.

@@ -9,6 +9,7 @@
 !/package-lock.json
 !/railway.json
 !/server/
+!/web/
 !/public/
 !/viz/
 /viz/*
