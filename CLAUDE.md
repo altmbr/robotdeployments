@@ -53,3 +53,27 @@ See research/SCHEMA.md (claims, metrics, autonomy/robot test, receipts) and rese
 `added_at` = when a company was first loaded into the live DB (Postgres `company_added`, never truncated; pre-existing
 companies backfilled from `server/added_seed.json`). To act on "companies added after X", filter `/api/data` by `added_at`.
 Headline = max credible shipped/deployed/installed/fleet claim; orders, pilots and capacity never count as shipped.
+
+## Editing data (manual overrides; all read by merge.py / build_viz.py)
+- Same company, two names → `data/company_aliases.json` (variant → canonical).
+- Not a robot / exclude a company → `research/verify/ptype_zz_manual.jsonl` (`class: not_robot` + reason).
+- Reject one claim → `research/verify/manual_*.jsonl` `{file, line (0-based), verdict: reject, reason}`.
+- Shut down → `research/verify/status_*.jsonl` (lifecycle `shut_down`, ended, public source_url).
+- New company metadata → `research/enrich/*.jsonl` (copy the format of `manual_2026-11-06.jsonl`).
+- X handles → `research/handles/out/*.jsonl`; only `status: confirmed` ships (`x_handle`, shown in the company panel).
+- Robot-test rulings: driver-assist devices (comma.ai) and aimed weapons (ZeroMark) are not robots; autonomous
+  balloons count (WindBorne, Near Space Labs) with headline = units aloft, never cumulative launches.
+
+## Names found in private sources (meetings, fund folders, the owner's lists)
+Add a company only if public sources confirm it exists as a robotics company (stealth names are confidential);
+log the rest in `private/granola_cos/not_published.jsonl`. Never hint at sources in public commit messages.
+
+## Research workflows
+- WebSearch has a shared ~200-call session budget: one long background workflow (e.g. the X-handle hunt) starves every
+  other research run. Don't run search-heavy workflows in parallel; never scrape search engines to get around it.
+- Fund-portfolio sweeps: one agent per fund → dedupe vs `data/companies.csv` + aliases → research batches of 5.
+
+## Local test + deploy check
+- `docker run -d --rm --name rdi-pg -e POSTGRES_PASSWORD=x -p 55499:5432 postgres:16`, then
+  `DATABASE_URL=postgres://postgres:x@localhost:55499/postgres PORT=8799 node server/index.js` (port 55432 is taken).
+- Push to main auto-deploys; confirm with `curl -s https://www.altmbr.com/robot-deployment-index/api/companies/<name>`.

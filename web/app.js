@@ -30,7 +30,7 @@
     return CC.get(key);
   };
   const H = pseudo('hover'), F = pseudo('focus');
-  sheet.appendChild(document.createTextNode('.rdi-grp .rdi-x{opacity:0;transition:opacity .12s}.rdi-grp:hover .rdi-x,.rdi-x:focus-visible{opacity:1}.rdi-x:hover{background:#e9e8e4 !important;color:#0b0b0b !important}.rdi-xz .rdi-x{opacity:0;transition:opacity .12s}.rdi-xz:hover .rdi-x{opacity:1}@keyframes rdiflash{0%,60%{box-shadow:inset 0 0 0 3px #2a78d6}100%{box-shadow:inset 0 0 0 3px rgba(42,120,214,0)}}.rdi-flash{animation:rdiflash 1.6s ease-out}'));
+  sheet.appendChild(document.createTextNode('.rdi-grp .rdi-x,.rdi-xz .rdi-x{opacity:0;transition:opacity .12s}.rdi-grp:hover .rdi-x,.rdi-xz:hover .rdi-x,.rdi-x:focus-visible{opacity:1}.rdi-x:hover{background:#e9e8e4 !important;color:#0b0b0b !important}@keyframes rdiflash{0%,60%{box-shadow:inset 0 0 0 3px #2a78d6}100%{box-shadow:inset 0 0 0 3px rgba(42,120,214,0)}}.rdi-flash{animation:rdiflash 1.6s ease-out}'));
   const FONT = "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
 
   // ===================================================================== ResultsView (treemap + table)

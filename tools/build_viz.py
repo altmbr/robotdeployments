@@ -4,6 +4,7 @@ Run after tools/merge.py:  python3 -I tools/merge.py && python3 -I tools/build_v
 Confidential claims (notes contain CONFIDENTIAL or source is Gmail) are stripped."""
 import csv, json, os, re, glob
 from collections import defaultdict
+from datetime import date
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CC = {'USA': 'US', 'UNITED STATES': 'US', 'CHINA': 'CN', 'PRC': 'CN', 'JAPAN': 'JP', 'GERMANY': 'DE', 'UK': 'GB',
@@ -217,5 +218,5 @@ for r in out + gone:
 os.makedirs(f'{ROOT}/viz', exist_ok=True)
 meta = json.load(open(f'{ROOT}/data/aggregates.json'))
 with open(f'{ROOT}/viz/data.js', 'w') as fh:
-    fh.write('window.ROBOT_DATA = ' + json.dumps({'companies': out, 'gone': gone, 'n_claims': meta['n_claims'], 'built': __import__('datetime').date.today().isoformat(), 'use_case_names': UC_NAMES, 'vertical_names': V_NAMES, 'stage_order': STAGE_ORDER}, ensure_ascii=False) + ';\n')
+    fh.write('window.ROBOT_DATA = ' + json.dumps({'companies': out, 'gone': gone, 'n_claims': meta['n_claims'], 'built': date.today().isoformat(), 'use_case_names': UC_NAMES, 'vertical_names': V_NAMES, 'stage_order': STAGE_ORDER}, ensure_ascii=False) + ';\n')
 print(len(out), 'companies →', f'{ROOT}/viz/data.js')

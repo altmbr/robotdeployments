@@ -71,10 +71,9 @@ async function load() {
       }
     }
     const seed = fs.existsSync(SEED) ? JSON.parse(fs.readFileSync(SEED)) : {};
-    for (const [list, rows] of [['live', d.companies], ['gone', d.gone || []]])
-      for (const r of rows)
-        await c.query('INSERT INTO company_added (company, added_at) VALUES ($1, COALESCE($2::timestamptz, now())) ON CONFLICT (company) DO NOTHING',
-          [r.company, seed[r.company] || null]);
+    for (const r of [...d.companies, ...(d.gone || [])])
+      await c.query('INSERT INTO company_added (company, added_at) VALUES ($1, COALESCE($2::timestamptz, now())) ON CONFLICT (company) DO NOTHING',
+        [r.company, seed[r.company] || null]);
     const metaRows = { data_hash: hash, built: d.built, use_case_names: JSON.stringify(d.use_case_names),
       vertical_names: JSON.stringify(d.vertical_names), stage_order: JSON.stringify(d.stage_order) };
     for (const [k, v] of Object.entries(metaRows))
