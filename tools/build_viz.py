@@ -203,6 +203,17 @@ for r in out + gone:
         if r.get(many) and r.get(one_) not in r[many]: r[one_] = r[many][0]
     r.setdefault('use_cases', []); r.setdefault('verticals', []); r.setdefault('rounds', []); r.setdefault('funded_12m', False)
 print(f'enriched {n_enriched}/{len(out)} companies; funded last 12m: {sum(r["funded_12m"] for r in out)}')
+# ---- official X handles (research/handles/out/*.jsonl from the handle hunt; last line per company wins).
+# Only 'confirmed' handles (site links the account, or the account links the company's domain) are attached.
+XH = {}
+for f in sorted(glob.glob(f'{ROOT}/research/handles/out/*.jsonl')):
+    for line in open(f, errors='ignore'):
+        try: v = json.loads(line)
+        except Exception: continue
+        if v.get('company'): XH[canon(v['company'])] = v
+for r in out + gone:
+    v = XH.get(r['company'])
+    if v and v.get('status') == 'confirmed' and v.get('handle'): r['x_handle'] = v['handle'].lstrip('@')
 os.makedirs(f'{ROOT}/viz', exist_ok=True)
 meta = json.load(open(f'{ROOT}/data/aggregates.json'))
 with open(f'{ROOT}/viz/data.js', 'w') as fh:

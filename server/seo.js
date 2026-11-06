@@ -100,7 +100,7 @@ ${related.length ? `<h2>Similar companies</h2><div class="card">${related.map((x
     const jsonld = [
       { '@context': 'https://schema.org', '@type': 'Dataset', name: `${d.company} robot deployment count`, description: desc, url: `${SITE}/companies/${slug}`,
         isPartOf: { '@type': 'Dataset', name: 'Robot Deployment Index', url: SITE }, dateModified: built, creator: CREATOR, license: LICENSE,
-        about: { '@type': 'Organization', name: d.company, ...(d.website ? { url: d.website } : {}) },
+        about: { '@type': 'Organization', name: d.company, ...(d.website ? { url: d.website } : {}), ...(d.x_handle ? { sameAs: [`https://x.com/${d.x_handle}`] } : {}) },
         variableMeasured: { '@type': 'PropertyValue', name: `robots ${phrase}`, value: d.units, ...(d.as_of ? { observationDate: d.as_of } : {}) } },
       { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: [{ '@type': 'Question', name: `How many robots has ${d.company} deployed?`,
         acceptedAnswer: { '@type': 'Answer', text: `${d.company} has ${fmt(d.units)} robots ${phrase}${d.as_of ? ` as of ${when(d.as_of)}` : ''}${head && head.url ? `, according to ${host(head.url)}` : ''}.` } }] },

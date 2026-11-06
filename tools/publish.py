@@ -80,11 +80,12 @@ def clean_claim(co, c):
 
 DEP = ('deployed_active', 'fleet_size', 'installed_base', 'cumulative_deployed', 'cumulative_shipped')
 ROW = ['company', 'board', 'segment', 'segment_label', 'hq', 'form_factor', 'use_cases', 'primary_use_case', 'verticals', 'primary_vertical',
-       'offering', 'website', 'status', 'parent', 'total_raised', 'funded_12m', 'stage_12m', 'raised_12m', 'product_class', 'lifecycle', 'ended']
+       'offering', 'website', 'x_handle', 'status', 'parent', 'total_raised', 'funded_12m', 'stage_12m', 'raised_12m', 'product_class', 'lifecycle', 'ended']
 
 def clean_row(r):
     o = {k: r.get(k) for k in ROW}
     if o.get('website') and not is_http(o['website']): o['website'] = None
+    if o.get('x_handle') and not re.fullmatch(r'[A-Za-z0-9_]{1,15}', o['x_handle']): o['x_handle'] = None
     cl = [c for c in (clean_claim(r['company'], c) for c in r.get('claims') or []) if c]
     # leak-review fixes (private/review/*.jsonl): drop_claim | drop_quote | drop_company_numbers (replace_text applied below)
     for f in FIX.get(r['company'], []):

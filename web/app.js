@@ -205,7 +205,7 @@
       return {
         name: d.company, onClose: this.props.onClose, onSubmit: this.props.onSubmit,
         meta: [R.cname(d.hq), ...tags, status].filter(Boolean).join(' · '),
-        website: d.website || '', site: d.website ? d.website.replace(/^https?:\/\/(www\.)?/, '').replace(/\/.*$/, '') : '',
+        website: d.website || '', x: /^[A-Za-z0-9_]{1,15}$/.test(d.x_handle || '') ? d.x_handle : '', site: d.website ? d.website.replace(/^https?:\/\/(www\.)?/, '').replace(/\/.*$/, '') : '',
         offering: d.offering || '',
         ended: life ? life + (d.ended ? ' ' + d.ended + '.' : '.') : '', endedWhy: d.life_evidence || '',
         units: d.units ? R.short(d.units) : '—',
@@ -238,6 +238,7 @@
               <div style=${S('display:flex;flex-wrap:wrap;gap:2px 6px;color:#8a8984;font-size:12.5px')}>
                 <span>${v.meta}</span>
                 ${v.site && html`<a href=${v.website} target="_blank" rel="noopener" style=${S('color:#2a78d6')}>${v.site} ↗</a>`}
+                ${v.x && html`<a href=${'https://x.com/' + v.x} target="_blank" rel="noopener" title="On X" style=${S('color:#2a78d6')}>@${v.x} ↗</a>`}
               </div>
             </div>
             ${this.props.onHide && html`<button onClick=${this.props.onHide} title="Hide this company from the map and totals" className=${H('border-color:#8a8984')} style=${S('height:28px;flex:none;border:1px solid #e3e2dd;background:#ffffff;border-radius:999px;cursor:pointer;font:inherit;font-size:12.5px;color:#52514e;padding:0 11px')}>Hide</button>`}
