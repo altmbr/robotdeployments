@@ -8,7 +8,7 @@
     "start": "node server/index.js"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "dependencies": {
     "@aws-sdk/client-sesv2": "^3.1163.0",

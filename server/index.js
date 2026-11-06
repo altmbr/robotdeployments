@@ -9,7 +9,8 @@ const { load, dataset, pool, addSubmission } = require('./db');
 const PORT = process.env.PORT || 3000;
 const WEB = path.join(__dirname, '..', 'web');
 const STATIC = Object.fromEntries([['/', 'index.html', 'text/html; charset=utf-8'], ['/app.js', 'app.js', 'application/javascript; charset=utf-8'],
-  ['/rdi.js', 'rdi.js', 'application/javascript; charset=utf-8']].map(([u, f, t]) => [u, { body: fs.readFileSync(path.join(WEB, f)), type: t }]));
+  ['/rdi.js', 'rdi.js', 'application/javascript; charset=utf-8'], ['/og.png', 'og.png', 'image/png'], ['/favicon.svg', 'favicon.svg', 'image/svg+xml'],
+  ['/favicon-32.png', 'favicon-32.png', 'image/png'], ['/favicon.ico', 'favicon-32.png', 'image/png'], ['/apple-touch-icon.png', 'apple-touch-icon.png', 'image/png']].map(([u, f, t]) => [u, { body: fs.readFileSync(path.join(WEB, f)), type: t }]));
 STATIC['/index.html'] = STATIC['/'];
 
 // ---- submissions: validate, rate-limit per IP, store privately ----
