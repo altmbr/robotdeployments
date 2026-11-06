@@ -13,6 +13,11 @@ const STATIC = Object.fromEntries([['/', 'index.html', 'text/html; charset=utf-8
   ['/rdi.js', 'rdi.js', 'application/javascript; charset=utf-8'], ['/og.png', 'og.png', 'image/png'], ['/favicon.svg', 'favicon.svg', 'image/svg+xml'],
   ['/favicon-32.png', 'favicon-32.png', 'image/png'], ['/favicon.ico', 'favicon-32.png', 'image/png'], ['/apple-touch-icon.png', 'apple-touch-icon.png', 'image/png']].map(([u, f, t]) => [u, { body: fs.readFileSync(path.join(WEB, f)), type: t }]));
 STATIC['/index.html'] = STATIC['/'];
+// cache-bust: script/style URLs carry a content hash, so a deploy is picked up immediately despite max-age caching
+const ver = (f) => crypto.createHash('sha1').update(STATIC[f].body).digest('hex').slice(0, 10);
+STATIC['/'].body = Buffer.from(STATIC['/'].body.toString()
+  .replace('/robot-deployment-index/app.js"', `/robot-deployment-index/app.js?v=${ver('/app.js')}"`)
+  .replace('/robot-deployment-index/rdi.js"', `/robot-deployment-index/rdi.js?v=${ver('/rdi.js')}"`));
 
 // ---- submissions: validate, rate-limit per IP, store privately ----
 const HITS = new Map(); // ip -> [timestamps]
@@ -71,6 +76,7 @@ async function refresh() {
   const S = seo.build(d);
   const indexHtml = STATIC['/'].body.toString()
     .replace('<div id="root"></div>', `<div id="root">${S.indexStatic}</div>`)
+    .replace('/robot-deployment-index/data.js"', `/robot-deployment-index/data.js?v=${crypto.createHash('sha1').update(json).digest('hex').slice(0, 10)}"`)
     .replace('</head>', `<script type="application/ld+json">${JSON.stringify(S.indexJsonld).replace(/</g, '\\u003c')}</script>\n</head>`);
   cache = { json, js: `window.ROBOT_DATA = ${json};\n`, seo: S, indexHtml,
     byName: Object.fromEntries([...d.companies, ...d.gone].map((r) => [r.company.toLowerCase(), r])) };
@@ -92,7 +98,7 @@ const server = http.createServer(async (req, res) => {
     if (p === '/healthz') return send(res, cache ? 200 : 503, 'text/plain', cache ? 'ok' : 'loading', { 'Cache-Control': 'no-store' });
     if (p === '/api/submissions') return req.method === 'POST' ? await submission(req, res) : send(res, 405, 'text/plain', 'method not allowed', { Allow: 'POST' });
     if (!cache) return send(res, 503, 'text/plain', 'loading', { 'Retry-After': '5' });
-    if (p === '/' || p === '/index.html') return send(res, 200, 'text/html; charset=utf-8', cache.indexHtml);
+    if (p === '/' || p === '/index.html') return send(res, 200, 'text/html; charset=utf-8', cache.indexHtml, { 'Cache-Control': 'public, max-age=60' });
     if (STATIC[p]) return send(res, 200, STATIC[p].type, STATIC[p].body);
     if (p === '/sitemap.xml') return send(res, 200, 'application/xml; charset=utf-8', cache.seo.sitemap);
     if (p === '/companies' || p === '/companies/') return send(res, 200, 'text/html; charset=utf-8', cache.seo.hub);

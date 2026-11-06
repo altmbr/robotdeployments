@@ -30,7 +30,7 @@
     return CC.get(key);
   };
   const H = pseudo('hover'), F = pseudo('focus');
-  sheet.appendChild(document.createTextNode('.rdi-grp .rdi-x{opacity:0;transition:opacity .12s}.rdi-grp:hover .rdi-x,.rdi-x:focus-visible{opacity:1}.rdi-x:hover{background:#e9e8e4 !important;color:#0b0b0b !important}'));
+  sheet.appendChild(document.createTextNode('.rdi-grp .rdi-x{opacity:0;transition:opacity .12s}.rdi-grp:hover .rdi-x,.rdi-x:focus-visible{opacity:1}.rdi-x:hover{background:#e9e8e4 !important;color:#0b0b0b !important}.rdi-tile:hover .rdi-x{opacity:1}@keyframes rdiflash{0%,60%{box-shadow:inset 0 0 0 3px #2a78d6}100%{box-shadow:inset 0 0 0 3px rgba(42,120,214,0)}}.rdi-flash{animation:rdiflash 1.6s ease-out}'));
   const FONT = "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
 
   // ===================================================================== ResultsView (treemap + table)
@@ -95,13 +95,15 @@
           style: { position: 'absolute', left: n.x0, top: n.y0, width: w, height: n.y1 - n.y0, background: '#ffffff', borderRadius: 6, boxShadow: hot ? 'inset 0 0 0 1.5px #8a8984' : 'none' },
           onClick: () => p.onZoom && p.onZoom(key),
           onHide: p.onHide && w > 64 ? (e) => { e.stopPropagation(); this.setState({ tip: null }); p.onHide(key); } : null,
+          flash: p.flash === 'g:' + key,
           onMove: (e) => tipAt(e, { g: key, label: full, value: n.value, n: n.leaves().length }) };
       });
       const sel = p.selected;
       base.tiles = root.leaves().filter((l) => l.data && l.data.company).map((l) => {
         const d = l.data, w = Math.max(0, l.x1 - l.x0), h = Math.max(0, l.y1 - l.y0), bg = R.colorOf(d, colorBy), isSel = sel && sel === d.company;
         const showName = w >= 46 && h >= 24;
-        return { key: d.company, name: d.company, units: R.short(d.units), showName, showUnits: showName && h > 38,
+        return { key: d.company, name: d.company, units: R.short(d.units), showName, showUnits: showName && h > 38, flash: p.flash === 'c:' + d.company,
+          onHideCo: p.onHideCo && w >= 46 && h >= 24 ? (e) => { e.stopPropagation(); this.setState({ tip: null }); p.onHideCo(d.company); } : null,
           style: { position: 'absolute', left: l.x0, top: l.y0, width: w, height: h, background: bg, color: R.ink(bg), borderRadius: Math.min(4, w / 4, h / 4),
             padding: showName ? '4px 6px' : 0, boxSizing: 'border-box', overflow: 'hidden', cursor: 'pointer',
             boxShadow: isSel || (hov && hov.d === d) ? 'inset 0 0 0 2px #0b0b0b' : 'none', zIndex: hov && hov.d === d ? 2 : 'auto',
@@ -125,7 +127,7 @@
     }
 
     render() {
-      const v = this.vals(), td = 'padding:7px 8px;border-bottom:1px solid #e3e2dd;';
+      const v = this.vals(), td = 'padding:7px 8px;border-bottom:1px solid #e3e2dd;', p_flash = '~' + (this.props.flashN || 0);
       return html`<div style=${S(`display:flex;flex-direction:column;gap:10px;width:100%;height:100%;min-height:0;font-family:${FONT};font-size:13px;color:#0b0b0b`)}>
         ${v.zoomLabel && html`<div style=${S('display:flex;align-items:center;gap:8px;font-size:13px')}>
           <button onClick=${v.clearZoom} style=${S('display:flex;align-items:center;gap:4px;border:1px solid #e3e2dd;background:#ffffff;border-radius:999px;padding:3px 10px 3px 8px;font:inherit;font-size:12.5px;color:#0b0b0b;cursor:pointer')}>← All</button>
@@ -134,7 +136,7 @@
         </div>`}
         ${v.isMap && html`
           <div ref=${this.boxRef} style=${S('position:relative;flex:1;min-height:0')}>
-            ${v.groups.map((g) => html`<div key=${'g' + g.key} style=${g.style} className="rdi-grp">
+            ${v.groups.map((g) => html`<div key=${'g' + g.key + (g.flash ? p_flash : '')} style=${g.style} className=${'rdi-grp' + (g.flash ? ' rdi-flash' : '')}>
               <div onClick=${g.onClick} onMouseMove=${g.onMove} onMouseLeave=${this.hideTip} style=${S('display:flex;align-items:baseline;gap:6px;height:20px;padding:3px 3px 0 6px;cursor:zoom-in;overflow:hidden;white-space:nowrap')}>
                 <span style=${S('flex:0 1 auto;min-width:0;font-size:12px;font-weight:650;overflow:hidden;text-overflow:ellipsis')}>${g.label}</span>
                 <span style=${S('flex:none;font-size:11.5px;color:#8a8984;font-variant-numeric:tabular-nums')}>${g.value}</span>
@@ -142,7 +144,9 @@
                   style=${S('margin-left:auto;align-self:center;flex:none;width:16px;height:16px;border:0;border-radius:999px;background:#f4f3f0;color:#52514e;font:inherit;font-size:12px;line-height:16px;padding:0;cursor:pointer')}>×</button>`}
               </div>
             </div>`)}
-            ${v.tiles.map((t) => html`<div key=${'t' + t.key} style=${t.style} onClick=${t.onClick} onMouseMove=${t.onMove} onMouseLeave=${this.hideTip}>
+            ${v.tiles.map((t) => html`<div key=${'t' + t.key + (t.flash ? p_flash : '')} style=${t.style} className=${'rdi-tile' + (t.flash ? ' rdi-flash' : '')} onClick=${t.onClick} onMouseMove=${t.onMove} onMouseLeave=${this.hideTip}>
+              ${t.onHideCo && html`<button className="rdi-x" onClick=${t.onHideCo} title=${'Hide ' + t.name} aria-label=${'Hide ' + t.name}
+                style=${S('position:absolute;top:3px;right:3px;width:16px;height:16px;border:0;border-radius:999px;background:rgba(255,255,255,.88);color:#52514e;font:inherit;font-size:12px;line-height:16px;padding:0;cursor:pointer;z-index:3')}>×</button>`}
               ${t.showName && html`<div style=${S('font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:15px')}>${t.name}</div>`}
               ${t.showUnits && html`<div style=${S('font-size:12px;opacity:.85;font-variant-numeric:tabular-nums;line-height:15px;margin-top:1px')}>${t.units}</div>`}
             </div>`)}
@@ -236,6 +240,7 @@
                 ${v.site && html`<a href=${v.website} target="_blank" rel="noopener" style=${S('color:#2a78d6')}>${v.site} ↗</a>`}
               </div>
             </div>
+            ${this.props.onHide && html`<button onClick=${this.props.onHide} title="Hide this company from the map and totals" className=${H('border-color:#8a8984')} style=${S('height:28px;flex:none;border:1px solid #e3e2dd;background:#ffffff;border-radius:999px;cursor:pointer;font:inherit;font-size:12.5px;color:#52514e;padding:0 11px')}>Hide</button>`}
             ${v.onClose && html`<button onClick=${v.onClose} aria-label="Close" className=${H('background:#e9e8e4')} style=${S('width:28px;height:28px;flex:none;border:0;background:#f4f3f0;border-radius:999px;cursor:pointer;font-size:15px;line-height:1;color:#52514e')}>×</button>`}
           </div>
           ${v.offering && html`<p style=${S('margin:0;color:#52514e;text-wrap:pretty;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden')}>${v.offering}</p>`}
@@ -302,7 +307,7 @@
 
   // ===================================================================== App (Robot Index)
   const PROPS = { defaultCategory: 'all', detailStyle: 'panel', showLegend: true };
-  const PERSIST = ['cat', 'vertical', 'usecase', 'funding', 'country', 'conf', 'exAmazon', 'groupBy', 'colorBy', 'view', 'subset', 'hidden'];
+  const PERSIST = ['cat', 'vertical', 'usecase', 'funding', 'country', 'conf', 'exAmazon', 'groupBy', 'colorBy', 'view', 'subset', 'hidden', 'hiddenCos'];
 
   class App extends Component {
     constructor(p) {
@@ -311,7 +316,7 @@
       try { saved = JSON.parse(localStorage.getItem('rdi-index-v2') || '{}'); } catch (e) {}
       this.state = { w: 1200,
         cat: PROPS.defaultCategory, vertical: 'all', usecase: 'all', funding: 'all', country: 'all', conf: 'all', exAmazon: false, q: '',
-        groupBy: 'primary_vertical', colorBy: 'segment', view: 'map', subset: 'counted', zoom: null, sel: null, menu: null, menuQ: '', sub: null, hidden: {}, ...saved };
+        groupBy: 'primary_vertical', colorBy: 'segment', view: 'map', subset: 'counted', zoom: null, sel: null, menu: null, menuQ: '', sub: null, hidden: {}, hiddenCos: [], flash: null, flashN: 0, ...saved };
     }
     rootRef = (el) => {
       if (el === this.root) return;
@@ -442,7 +447,9 @@
         style: { border: small ? '1px solid ' + (cur === v ? '#0b0b0b' : '#e3e2dd') : 0, borderRadius: small ? 999 : 6, padding: small ? '4px 11px' : '5px 12px', font: 'inherit', fontSize: 12.5, cursor: 'pointer', whiteSpace: 'nowrap',
           background: cur === v ? '#0b0b0b' : small ? '#ffffff' : 'transparent', color: cur === v ? '#fcfcfb' : '#0b0b0b' } }));
       const hid = s.groupBy !== 'none' ? ((s.hidden || {})[s.groupBy] || []) : [];
-      const keep = (d) => !hid.includes(d[s.groupBy]);
+      const hidCos = s.hiddenCos || [];
+      const keep = (d) => !hid.includes(d[s.groupBy]) && !hidCos.includes(d.company);
+      const flash = (f) => this.setState((st) => ({ flash: f, flashN: (st.flashN || 0) + 1 }));
       const rows = R.filter(s).filter(keep), sum = R.summary(rows), gone = R.filter(s, R.GONE).filter(keep);
       const setHidden = (list) => this.setState((st) => ({ hidden: { ...(st.hidden || {}), [st.groupBy]: list }, zoom: null }));
       const wide = s.w >= 1000, drawer = p.detailStyle === 'drawer' || !wide;
@@ -507,10 +514,15 @@
           slot('funding', 'with', FUNDL[s.funding], s.funding !== 'all', R.FUNDING.map(([v]) => ({ value: v, label: FUNDL[v], count: v === 'all' ? ff.total : (ff.m.get(v) || { n: 0 }).n }))),
           slot('groupBy', 'Grouped by', GRPL[s.groupBy], false, R.GROUPS.map(([v]) => ({ value: v, label: GRPL[v], count: '' }))),
         ],
-        nActive: ['vertical', 'usecase', 'country', 'funding'].filter((k) => s[k] !== 'all').length + hid.length,
-        clearAll: () => this.up({ vertical: 'all', usecase: 'all', country: 'all', funding: 'all', hidden: {} }, true),
+        nActive: ['vertical', 'usecase', 'country', 'funding'].filter((k) => s[k] !== 'all').length + hid.length + hidCos.length,
+        clearAll: () => this.up({ vertical: 'all', usecase: 'all', country: 'all', funding: 'all', hidden: {}, hiddenCos: [] }, true),
         onHide: (key) => { if (!hid.includes(key)) setHidden([...hid, key]); },
-        hiddenChips: hid.map((k) => ({ key: k, label: R.labelOf(s.groupBy, k), restore: () => setHidden(hid.filter((x) => x !== k)) })),
+        onHideCo: (name) => this.setState((st) => ({ hiddenCos: [...(st.hiddenCos || []).filter((x) => x !== name), name], sel: st.sel && st.sel.company === name ? null : st.sel })),
+        hiddenChips: [
+          ...hid.map((k) => ({ key: 'g:' + k, label: R.labelOf(s.groupBy, k), restore: () => { setHidden(hid.filter((x) => x !== k)); flash('g:' + k); } })),
+          ...hidCos.map((n) => ({ key: 'c:' + n, label: n, restore: () => { this.setState((st) => ({ hiddenCos: (st.hiddenCos || []).filter((x) => x !== n) })); flash('c:' + n); } })),
+        ],
+        flash: s.flash, flashN: s.flashN,
         viewSeg: seg([['map', 'Map'], ['table', 'Table']], s.view, (v) => this.setState({ view: v })),
         subsetSeg: seg([['counted', 'With a count', sum.companies], ['none', 'No public count yet', sum.uncounted], ['gone', 'Shut down / exited', gone.length]], s.subset, (v) => this.setState({ subset: v }), true),
         showUncounted: () => this.setState({ view: 'table', subset: 'none' }),
@@ -614,7 +626,7 @@
     render() {
       const v = this.vals();
       const pop = 'background:#ffffff;border:1px solid #e3e2dd;border-radius:12px;box-shadow:0 14px 40px rgba(0,0,0,.14);';
-      const detail = html`<${CompanyDetail} company=${v.sel} onClose=${v.closeDetail} onSubmit=${v.submitForSel} />`;
+      const detail = html`<${CompanyDetail} company=${v.sel} onClose=${v.closeDetail} onSubmit=${v.submitForSel} onHide=${v.sel ? () => v.onHideCo(v.sel.company) : null} />`;
       return html`<div ref=${this.rootRef} style=${S(`position:relative;min-height:100vh;display:flex;flex-direction:column;max-width:1480px;margin:0 auto;padding:22px clamp(16px, 3vw, 40px);font-family:${FONT};font-size:14px;line-height:1.4;color:#0b0b0b`)}>
         ${v.anyOpen && html`<div onClick=${v.closeAll} style=${S('position:fixed;inset:0;z-index:19')}></div>`}
 
@@ -699,7 +711,7 @@
 
         <div style=${v.bodyGrid}>
           <div style=${S('min-width:0;min-height:0;display:flex;flex-direction:column;background:#fcfcfb;border:1px solid #e3e2dd;border-radius:12px;padding:12px')}>
-            <${ResultsView} rows=${v.resultRows} onHide=${v.onHide} groupBy=${v.groupBy} colorBy=${v.colorBy} view=${v.view} zoom=${v.zoom} selected=${v.selName} showLegend=${v.showLegend} onZoom=${v.onZoom} onSelect=${v.onSelect} />
+            <${ResultsView} rows=${v.resultRows} onHide=${v.onHide} onHideCo=${v.onHideCo} flash=${v.flash} flashN=${v.flashN} groupBy=${v.groupBy} colorBy=${v.colorBy} view=${v.view} zoom=${v.zoom} selected=${v.selName} showLegend=${v.showLegend} onZoom=${v.onZoom} onSelect=${v.onSelect} />
           </div>
           ${v.panelInline && html`<div style=${S('min-height:0;background:#fcfcfb;border:1px solid #e3e2dd;border-radius:12px;overflow:hidden')}>${detail}</div>`}
         </div>
