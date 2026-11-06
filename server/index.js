@@ -37,11 +37,16 @@ async function submission(req, res) {
   notify(id, x).catch((e) => console.error('notify failed', id, e.message));  // never blocks or fails the submission
 }
 
-// Email the owner about each new submission via SendGrid. Config lives in Railway variables (never in git):
-// SENDGRID_API_KEY, NOTIFY_TO (recipient), NOTIFY_FROM (a SendGrid-verified sender). Missing config = no email.
+// Email the owner about each new submission via AWS SES (same sender setup as Teahose: verified domain
+// teahose.com, region us-west-2). Config in Railway variables, never in git: AWS_ACCESS_KEY_ID,
+// AWS_SECRET_ACCESS_KEY, NOTIFY_TO, optional NOTIFY_FROM. Missing config = no email.
+const { SESv2Client, SendEmailCommand } = require('@aws-sdk/client-sesv2');
+let ses = null;
 async function notify(id, x) {
-  const { SENDGRID_API_KEY: key, NOTIFY_TO: to, NOTIFY_FROM: from } = process.env;
-  if (!key || !to || !from) return;
+  const { AWS_ACCESS_KEY_ID: id_, AWS_SECRET_ACCESS_KEY: secret, NOTIFY_TO: to } = process.env;
+  const from = process.env.NOTIFY_FROM || 'Robot Deployment Index <agent@teahose.com>';
+  if (!id_ || !secret || !to) return;
+  ses = ses || new SESv2Client({ region: process.env.AWS_SES_REGION || 'us-west-2', credentials: { accessKeyId: id_, secretAccessKey: secret } });
   const lines = [
     `${x.existing ? 'Existing company' : 'NEW company'}: ${x.company}`,
     `Robots: ${x.units.toLocaleString('en-US')}`,
@@ -51,11 +56,10 @@ async function notify(id, x) {
     `From: ${[x.name, x.email].filter(Boolean).join(' <') + (x.name && x.email ? '>' : '') || 'anonymous'}`,
     '', `Submission #${id}. Verify the source before it goes into the index.`,
   ].filter((l) => l !== null);
-  const body = { personalizations: [{ to: [{ email: to }] }], from: { email: from, name: 'Robot Deployment Index' },
-    subject: `New submission: ${x.company} (${x.units.toLocaleString('en-US')} robots)`, content: [{ type: 'text/plain', value: lines.join('\n') }] };
-  if (x.email) body.reply_to = { email: x.email, ...(x.name ? { name: x.name } : {}) };
-  const r = await fetch('https://api.sendgrid.com/v3/mail/send', { method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  if (!r.ok) throw new Error(`sendgrid ${r.status} ${(await r.text()).slice(0, 200)}`);
+  await ses.send(new SendEmailCommand({
+    FromEmailAddress: from, Destination: { ToAddresses: [to] }, ...(x.email ? { ReplyToAddresses: [x.email] } : {}),
+    Content: { Simple: { Subject: { Data: `New submission: ${x.company} (${x.units.toLocaleString('en-US')} robots)` }, Body: { Text: { Data: lines.join('\n') } } } },
+  }));
 }
 let cache = null; // { js, json, companies } rebuilt after load
 

@@ -30,7 +30,7 @@ meeting notes). Only the sanitized build ever leaves this machine.
 - **Lists of dropped numbers stay in `private/`** (publishing the drop list would publish the numbers).
 - **New private-sourced claims** (new local mining, manual claims) => re-run the source triage workflow for the new
   sources and the leak-review workflow before pushing. Both workflows read/write under `private/`.
-- Secrets: XAI_API_KEY, PODSCAN_API_KEY and SENDGRID_API_KEY live in GCP Secret Manager; DATABASE_URL and the
+- Secrets: XAI_API_KEY, PODSCAN_API_KEY and the SES keys (AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY) live in GCP Secret Manager; DATABASE_URL and the
 notification vars live on Railway. Never print
   or commit them.
 
@@ -44,8 +44,9 @@ notification vars live on Railway. Never print
 Stored in the Postgres `submissions` table on Railway (name/email are personal data: never published, never in git,
 never served by the API). A submission is a LEAD, not a claim: verify it through the normal research pipeline
 (fetch the source, confirm the number) before anything reaches `public/data.json`.
-Each new submission emails the owner via SendGrid (Railway vars `SENDGRID_API_KEY`, `NOTIFY_TO`, `NOTIFY_FROM`;
-key also in GCP Secret Manager). Missing vars = no email; email failure never blocks the submission.
+Each new submission emails the owner via AWS SES, same setup as Teahose (verified domain teahose.com, us-west-2,
+sender agent@teahose.com). Railway vars: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` (copied from GCP Secret Manager),
+`NOTIFY_TO`, optional `NOTIFY_FROM`. Missing vars = no email; email failure never blocks the submission.
 
 ## Data model
 See research/SCHEMA.md (claims, metrics, autonomy/robot test, receipts) and research/TAXONOMY.md (use cases, verticals).
