@@ -56,8 +56,11 @@ for r in rows:
     })
 # ---- Enrichment: taxonomy tags + funding rounds (research/enrich/*.jsonl, see research/TAXONOMY.md) ----
 def nkey(s):
+    raw = s
     s = re.sub(r'\(.*?\)', '', (s or '').lower()).replace('&', 'and')
-    return re.sub(r'[^a-z0-9]', '', re.sub(r'\b(inc|robotics|robotic|robots|robot|technologies|technology|co|corp|ltd|gmbh|ai|the)\b', '', s))
+    k = re.sub(r'[^a-z0-9]', '', re.sub(r'\b(inc|robotics|robotic|robots|robot|technologies|technology|co|corp|ltd|gmbh|ai|the)\b', '', s))
+    # names that are all CJK (or all stop-words) reduce to '' and would merge unrelated companies: key on the full name
+    return k or re.sub(r'\s+', '', (raw or '').lower())
 LABELS = {}
 for line in open(f'{ROOT}/research/TAXONOMY.md'):
     m = re.match(r'\|\s*`([a-z_]+)`\s*\|\s*([^|]+)\|', line)

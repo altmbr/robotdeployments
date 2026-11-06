@@ -30,6 +30,7 @@
     return CC.get(key);
   };
   const H = pseudo('hover'), F = pseudo('focus');
+  sheet.appendChild(document.createTextNode('.rdi-grp .rdi-x{opacity:0;transition:opacity .12s}.rdi-grp:hover .rdi-x,.rdi-x:focus-visible{opacity:1}.rdi-x:hover{background:#e9e8e4 !important;color:#0b0b0b !important}'));
   const FONT = "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
 
   // ===================================================================== ResultsView (treemap + table)
@@ -93,6 +94,7 @@
         return { key, label: w > 64 ? full : '', value: w > 64 ? R.short(n.value) : '',
           style: { position: 'absolute', left: n.x0, top: n.y0, width: w, height: n.y1 - n.y0, background: '#ffffff', borderRadius: 6, boxShadow: hot ? 'inset 0 0 0 1.5px #8a8984' : 'none' },
           onClick: () => p.onZoom && p.onZoom(key),
+          onHide: p.onHide && w > 64 ? (e) => { e.stopPropagation(); this.setState({ tip: null }); p.onHide(key); } : null,
           onMove: (e) => tipAt(e, { g: key, label: full, value: n.value, n: n.leaves().length }) };
       });
       const sel = p.selected;
@@ -132,10 +134,12 @@
         </div>`}
         ${v.isMap && html`
           <div ref=${this.boxRef} style=${S('position:relative;flex:1;min-height:0')}>
-            ${v.groups.map((g) => html`<div key=${'g' + g.key} style=${g.style}>
-              <div onClick=${g.onClick} onMouseMove=${g.onMove} onMouseLeave=${this.hideTip} style=${S('display:flex;align-items:baseline;gap:6px;height:20px;padding:3px 6px 0;cursor:zoom-in;overflow:hidden;white-space:nowrap')}>
+            ${v.groups.map((g) => html`<div key=${'g' + g.key} style=${g.style} className="rdi-grp">
+              <div onClick=${g.onClick} onMouseMove=${g.onMove} onMouseLeave=${this.hideTip} style=${S('display:flex;align-items:baseline;gap:6px;height:20px;padding:3px 3px 0 6px;cursor:zoom-in;overflow:hidden;white-space:nowrap')}>
                 <span style=${S('flex:0 1 auto;min-width:0;font-size:12px;font-weight:650;overflow:hidden;text-overflow:ellipsis')}>${g.label}</span>
                 <span style=${S('flex:none;font-size:11.5px;color:#8a8984;font-variant-numeric:tabular-nums')}>${g.value}</span>
+                ${g.onHide && html`<button className="rdi-x" onClick=${g.onHide} onMouseMove=${(e) => e.stopPropagation()} title=${'Hide ' + g.label} aria-label=${'Hide ' + g.label}
+                  style=${S('margin-left:auto;align-self:center;flex:none;width:16px;height:16px;border:0;border-radius:999px;background:#f4f3f0;color:#52514e;font:inherit;font-size:12px;line-height:16px;padding:0;cursor:pointer')}>×</button>`}
               </div>
             </div>`)}
             ${v.tiles.map((t) => html`<div key=${'t' + t.key} style=${t.style} onClick=${t.onClick} onMouseMove=${t.onMove} onMouseLeave=${this.hideTip}>
@@ -298,7 +302,7 @@
 
   // ===================================================================== App (Robot Index)
   const PROPS = { defaultCategory: 'all', detailStyle: 'panel', showLegend: true };
-  const PERSIST = ['cat', 'vertical', 'usecase', 'funding', 'country', 'conf', 'exAmazon', 'groupBy', 'colorBy', 'view', 'subset'];
+  const PERSIST = ['cat', 'vertical', 'usecase', 'funding', 'country', 'conf', 'exAmazon', 'groupBy', 'colorBy', 'view', 'subset', 'hidden'];
 
   class App extends Component {
     constructor(p) {
@@ -307,7 +311,7 @@
       try { saved = JSON.parse(localStorage.getItem('rdi-index-v2') || '{}'); } catch (e) {}
       this.state = { w: 1200,
         cat: PROPS.defaultCategory, vertical: 'all', usecase: 'all', funding: 'all', country: 'all', conf: 'all', exAmazon: false, q: '',
-        groupBy: 'primary_vertical', colorBy: 'segment', view: 'map', subset: 'counted', zoom: null, sel: null, menu: null, menuQ: '', sub: null, ...saved };
+        groupBy: 'primary_vertical', colorBy: 'segment', view: 'map', subset: 'counted', zoom: null, sel: null, menu: null, menuQ: '', sub: null, hidden: {}, ...saved };
     }
     rootRef = (el) => {
       if (el === this.root) return;
@@ -437,12 +441,15 @@
       const seg = (items, cur, onPick, small) => items.map(([v, l, count]) => ({ key: v, label: l, count: count == null ? '' : count, onClick: () => onPick(v),
         style: { border: small ? '1px solid ' + (cur === v ? '#0b0b0b' : '#e3e2dd') : 0, borderRadius: small ? 999 : 6, padding: small ? '4px 11px' : '5px 12px', font: 'inherit', fontSize: 12.5, cursor: 'pointer', whiteSpace: 'nowrap',
           background: cur === v ? '#0b0b0b' : small ? '#ffffff' : 'transparent', color: cur === v ? '#fcfcfb' : '#0b0b0b' } }));
-      const rows = R.filter(s), sum = R.summary(rows), gone = R.filter(s, R.GONE);
+      const hid = s.groupBy !== 'none' ? ((s.hidden || {})[s.groupBy] || []) : [];
+      const keep = (d) => !hid.includes(d[s.groupBy]);
+      const rows = R.filter(s).filter(keep), sum = R.summary(rows), gone = R.filter(s, R.GONE).filter(keep);
+      const setHidden = (list) => this.setState((st) => ({ hidden: { ...(st.hidden || {}), [st.groupBy]: list }, zoom: null }));
       const wide = s.w >= 1000, drawer = p.detailStyle === 'drawer' || !wide;
       const CATL = { all: 'all robots', autonomous: 'autonomous robots', industrial: 'industrial arms', healthcare: 'healthcare robots', consumer: 'consumer robots' };
       const FUNDL = { all: 'any funding history', '12m': 'a raise in the last 12 months', early: 'a Pre-seed–Series A raise in the last 12 months', mid: 'a Series B+ raise in the last 12 months' };
       const GRPL = { primary_vertical: 'industry', primary_use_case: 'task', segment: 'segment', hq: 'country', none: 'nothing (companies only)' };
-      const POST = { usecase: ',', funding: '.', groupBy: '.' };
+      const POST = { usecase: ',', funding: '.', groupBy: hid.length ? ',' : '.' };
       const mq = s.menuQ.trim().toLowerCase();
       const optStyle = (on) => ({ display: 'flex', alignItems: 'center', border: 0, borderRadius: 8, padding: '7px 10px', font: 'inherit', fontSize: 13.5, cursor: 'pointer',
         background: on ? '#f4f3f0' : 'transparent', color: '#0b0b0b', fontWeight: on ? 600 : 400, flex: 'none', gap: 16, whiteSpace: 'nowrap' });
@@ -500,8 +507,10 @@
           slot('funding', 'with', FUNDL[s.funding], s.funding !== 'all', R.FUNDING.map(([v]) => ({ value: v, label: FUNDL[v], count: v === 'all' ? ff.total : (ff.m.get(v) || { n: 0 }).n }))),
           slot('groupBy', 'Grouped by', GRPL[s.groupBy], false, R.GROUPS.map(([v]) => ({ value: v, label: GRPL[v], count: '' }))),
         ],
-        nActive: ['vertical', 'usecase', 'country', 'funding'].filter((k) => s[k] !== 'all').length,
-        clearAll: () => this.up({ vertical: 'all', usecase: 'all', country: 'all', funding: 'all' }, true),
+        nActive: ['vertical', 'usecase', 'country', 'funding'].filter((k) => s[k] !== 'all').length + hid.length,
+        clearAll: () => this.up({ vertical: 'all', usecase: 'all', country: 'all', funding: 'all', hidden: {} }, true),
+        onHide: (key) => { if (!hid.includes(key)) setHidden([...hid, key]); },
+        hiddenChips: hid.map((k) => ({ key: k, label: R.labelOf(s.groupBy, k), restore: () => setHidden(hid.filter((x) => x !== k)) })),
         viewSeg: seg([['map', 'Map'], ['table', 'Table']], s.view, (v) => this.setState({ view: v })),
         subsetSeg: seg([['counted', 'With a count', sum.companies], ['none', 'No public count yet', sum.uncounted], ['gone', 'Shut down / exited', gone.length]], s.subset, (v) => this.setState({ subset: v }), true),
         showUncounted: () => this.setState({ view: 'table', subset: 'none' }),
@@ -668,6 +677,13 @@
               </div>`}
             </span>
           </span>`)}
+          ${v.hiddenChips.length > 0 && html`<span style=${S('display:inline-flex;align-items:baseline;flex-wrap:wrap;gap:2px 8px')}>
+            <span>excluding</span>
+            ${v.hiddenChips.map((c, i) => html`<span key=${c.key} style=${S('display:inline-flex;align-items:baseline;white-space:nowrap')}>
+              <button onClick=${c.restore} title=${'Show ' + c.label + ' again'} className=${H('text-decoration-style:solid')}
+                style=${S('background:none;border:0;padding:0;font:inherit;cursor:pointer;color:#2a78d6;font-weight:600;text-decoration:underline;text-decoration-style:solid;text-decoration-color:#2a78d6;text-underline-offset:5px;text-decoration-thickness:1.5px')}>${c.label}<span style=${S('font-size:13px;margin-left:5px;color:#2a78d6')}>×</span></button><span>${i < v.hiddenChips.length - 1 ? ',' : '.'}</span>
+            </span>`)}
+          </span>`}
           ${v.nActive > 0 && html`<button onClick=${v.clearAll} style=${S('background:none;border:0;padding:0 0 0 4px;font:inherit;font-size:14px;color:#2a78d6;cursor:pointer')}>Reset</button>`}
         </div>
 
@@ -683,7 +699,7 @@
 
         <div style=${v.bodyGrid}>
           <div style=${S('min-width:0;min-height:0;display:flex;flex-direction:column;background:#fcfcfb;border:1px solid #e3e2dd;border-radius:12px;padding:12px')}>
-            <${ResultsView} rows=${v.resultRows} groupBy=${v.groupBy} colorBy=${v.colorBy} view=${v.view} zoom=${v.zoom} selected=${v.selName} showLegend=${v.showLegend} onZoom=${v.onZoom} onSelect=${v.onSelect} />
+            <${ResultsView} rows=${v.resultRows} onHide=${v.onHide} groupBy=${v.groupBy} colorBy=${v.colorBy} view=${v.view} zoom=${v.zoom} selected=${v.selName} showLegend=${v.showLegend} onZoom=${v.onZoom} onSelect=${v.onSelect} />
           </div>
           ${v.panelInline && html`<div style=${S('min-height:0;background:#fcfcfb;border:1px solid #e3e2dd;border-radius:12px;overflow:hidden')}>${detail}</div>`}
         </div>
