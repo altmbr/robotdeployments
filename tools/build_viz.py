@@ -173,12 +173,25 @@ def slugs(xs):
     return out
 def one(x):
     return slugs([x])[0] if slugs([x]) else ''
+# Off-taxonomy tags written by sweep agents -> TAXONOMY.md slugs (otherwise the site shows a raw slug or drops the tag)
+UC_SYN = {'inspection_monitoring': 'inspection_security', 'inspect_monitor': 'inspection_security', 'manipulation': 'manufacturing_process',
+          'manipulation_assembly': 'manufacturing_process', 'transport_logistics': 'move_goods_indoor', 'cleaning_floor_surface': 'cleaning',
+          'cleaning_facility': 'cleaning', 'defense_public_safety': 'defense_strike', 'spraying_application': 'crop_application',
+          'sorting_packing': 'pick_sort', 'pick_pack': 'pick_sort', 'surgery_assist': 'surgery_clinical', 'surgery': 'surgery_clinical',
+          'move_goods_outdoor': 'delivery_outdoor', 'delivery_transport': 'delivery_outdoor', 'construction_work': 'construction_tasks'}
+V_SYN = {'logistics': 'logistics_warehousing', 'warehouse_logistics': 'logistics_warehousing', 'energy_utilities': 'energy_mining_utilities',
+         'energy': 'energy_mining_utilities', 'retail_hospitality': 'retail_grocery', 'defense': 'defense_public_safety',
+         'public_safety': 'defense_public_safety', 'defense_security': 'defense_public_safety', 'agriculture': 'agriculture_crops',
+         'commercial_real_estate': 'facilities_real_estate', 'automotive': 'manufacturing', 'hospitality': 'hospitality_food_service',
+         'food_service': 'hospitality_food_service'}
+def ucs(x): return [UC_SYN.get(u, u) for u in slugs(x)]
+def vs(x): return [V_SYN.get(v, v) for v in slugs(x)]
 def attach(row, e):
     rs = rounds_of(e)
     recent = [r for r in rs if str(r['date']) >= CUTOFF]
     row.update({
-        'use_cases': [u for u in slugs(e.get('use_cases')) if u in UC_NAMES], 'primary_use_case': one(e.get('primary_use_case')),
-        'verticals': [v for v in slugs(e.get('verticals')) if v in V_NAMES], 'primary_vertical': one(e.get('primary_vertical')),
+        'use_cases': [u for u in dict.fromkeys(ucs(e.get('use_cases'))) if u in UC_NAMES], 'primary_use_case': UC_SYN.get(one(e.get('primary_use_case')), one(e.get('primary_use_case'))),
+        'verticals': [v for v in dict.fromkeys(vs(e.get('verticals'))) if v in V_NAMES], 'primary_vertical': V_SYN.get(one(e.get('primary_vertical')), one(e.get('primary_vertical'))),
         'offering': e.get('offering') or '', 'website': e.get('website') or '', 'status': e.get('status') or '',
         'parent': e.get('parent') or '', 'total_raised': e.get('total_raised_usd'),
         'rounds': [{'stage': r.get('stage'), 'date': str(r.get('date')), 'amount': r.get('amount_usd'),
@@ -207,7 +220,7 @@ BOARD_OF = {'surgery_clinical': 'healthcare', 'assist_rehab': 'healthcare', 'lab
             'household_chores': 'consumer', 'manufacturing_process': 'industrial'}
 for k, e in enrich.items():
     if k in seen or e.get('is_robot_maker') is False: continue
-    uc = one(e.get('primary_use_case'))
+    uc = UC_SYN.get(one(e.get('primary_use_case')), one(e.get('primary_use_case')))
     seg = UC_SEG.get(uc, 'other')
     row = {'company': e['company'], 'board': BOARD_OF.get(uc, 'autonomous'), 'segment': seg, 'segment_label': SEG.get(seg, 'Other'),
            'hq': cc(e.get('hq_country')), 'units': 0, 'orders': None, 'metric': 'no public count', 'as_of': '', 'confidence': 'low',
@@ -260,6 +273,15 @@ for r in out + gone:
     # primary tag missing (or not a valid slug) but tags present -> first listed tag is primary
     for many, one_ in (('verticals', 'primary_vertical'), ('use_cases', 'primary_use_case')):
         if r.get(many) and r.get(one_) not in r[many]: r[one_] = r[many][0]
+        if r.get(one_) not in (UC_NAMES if many == 'use_cases' else V_NAMES): r[one_] = 'other'
+try: TAG_OVR = {k: v for k, v in json.load(open(f'{ROOT}/data/tag_overrides.json')).items() if not k.startswith('_')}
+except FileNotFoundError: TAG_OVR = {}
+for r in out + gone:
+    for f, v in (TAG_OVR.get(r['company']) or {}).items():
+        if not f.startswith('_'): r[f] = v
+    if r['company'] in TAG_OVR and r.get('primary_use_case') in UC_SEG:  # keep segment/board in step with the new primary task
+        r['segment'] = UC_SEG[r['primary_use_case']]; r['segment_label'] = SEG.get(r['segment'], 'Other')
+        r['board'] = BOARD_OF.get(r['primary_use_case'], 'autonomous')
     r.setdefault('use_cases', []); r.setdefault('verticals', []); r.setdefault('rounds', []); r.setdefault('funded_12m', False)
 print(f'enriched {n_enriched}/{len(out)} companies; funded last 12m: {sum(r["funded_12m"] for r in out)}')
 # ---- official X handles (research/handles/out/*.jsonl; last line per company wins, but confirmed beats unconfirmed).

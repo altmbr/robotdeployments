@@ -84,22 +84,33 @@
       const grouped = groupBy !== 'none' && !zoom;
       const tree = grouped ? d3.group(data, (d) => d[groupBy]) : new Map([['', data]]);
       const root = d3.hierarchy(tree).sum((d) => d.units || 0).sort((a, b) => b.value - a.value);
-      d3.treemap().size([W, Hh]).paddingInner(2).paddingOuter(grouped ? 3 : 0).paddingTop((n) => grouped && n.depth > 0 && n.children ? 20 : 0).round(true)(root);
+      // Two passes: a group too small for its 20px label strip gets no strip (the strip would crush its tiles to slivers
+      // and leave an empty outlined box); its name still shows in the hover tip.
+      const layout = (noHead) => d3.treemap().size([W, Hh]).paddingInner(2).paddingOuter(grouped ? 3 : 0)
+        .paddingTop((n) => grouped && n.depth > 0 && n.children && !noHead.has(n.data[0]) ? 20 : 0).round(true)(root);
+      let small = new Set();
+      layout(small);
+      if (grouped) {
+        small = new Set(root.children.filter((n) => n.y1 - n.y0 < 44 || n.x1 - n.x0 < 64).map((n) => n.data[0]));
+        if (small.size) layout(small);
+      }
       const tipAt = (e, extra) => { const r = this.box.getBoundingClientRect(), k = r.width / (this.box.offsetWidth || 1);
         this.setState({ tip: { ...extra, x: (e.clientX - r.left) / k, y: (e.clientY - r.top) / k } }); };
       const hov = this.state.tip;
       if (grouped) base.groups = root.descendants().filter((n) => n.depth > 0 && n.children).map((n) => {
         const key = n.data[0], w = n.x1 - n.x0, full = R.labelOf(groupBy, key);
         const hot = hov && (hov.g === key || (hov.d && hov.d[groupBy] === key));
-        return { key, label: w > 64 ? full : '', value: w > 64 ? R.short(n.value) : '',
+        const lab = w > 64 && !small.has(key);
+        return { key, label: lab ? full : '', value: lab ? R.short(n.value) : '',
           style: { position: 'absolute', left: n.x0, top: n.y0, width: w, height: n.y1 - n.y0, background: '#ffffff', borderRadius: 6, boxShadow: hot ? 'inset 0 0 0 1.5px #8a8984' : 'none' },
           onClick: () => p.onZoom && p.onZoom(key),
-          onHide: p.onHide && w > 64 ? (e) => { e.stopPropagation(); this.setState({ tip: null }); p.onHide(key); } : null,
+          onHide: p.onHide && lab ? (e) => { e.stopPropagation(); this.setState({ tip: null }); p.onHide(key); } : null,
           flash: p.flash === 'g:' + key,
           onMove: (e) => tipAt(e, { g: key, label: full, value: n.value, n: n.leaves().length }) };
       });
       const sel = p.selected;
-      base.tiles = root.leaves().filter((l) => l.data && l.data.company).map((l) => {
+      // tiles under 4px read as stray lines; skip them (the group box beneath still takes hover/click)
+      base.tiles = root.leaves().filter((l) => l.data && l.data.company && l.x1 - l.x0 >= 4 && l.y1 - l.y0 >= 4).map((l) => {
         const d = l.data, w = Math.max(0, l.x1 - l.x0), h = Math.max(0, l.y1 - l.y0), bg = R.colorOf(d, colorBy), isSel = sel && sel === d.company;
         const showName = w >= 46 && h >= 24;
         return { key: d.company, name: d.company, units: R.short(d.units), showName, showUnits: showName && h > 38, flash: p.flash === 'c:' + d.company,
