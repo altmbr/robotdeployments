@@ -10,7 +10,7 @@ const seo = require('./seo');
 const PORT = process.env.PORT || 3000;
 const WEB = path.join(__dirname, '..', 'web');
 const STATIC = Object.fromEntries([['/', 'index.html', 'text/html; charset=utf-8'], ['/app.js', 'app.js', 'application/javascript; charset=utf-8'],
-  ['/rdi.js', 'rdi.js', 'application/javascript; charset=utf-8'], ['/subscribe.js', 'subscribe.js', 'application/javascript; charset=utf-8'], ['/og.png', 'og.png', 'image/png'], ['/favicon.svg', 'favicon.svg', 'image/svg+xml'],
+  ['/rdi.js', 'rdi.js', 'application/javascript; charset=utf-8'], ['/subscribe.js', 'subscribe.js', 'application/javascript; charset=utf-8'], ['/ph.js', 'ph.js', 'application/javascript; charset=utf-8'], ['/og.png', 'og.png', 'image/png'], ['/favicon.svg', 'favicon.svg', 'image/svg+xml'],
   ['/favicon-32.png', 'favicon-32.png', 'image/png'], ['/favicon.ico', 'favicon-32.png', 'image/png'], ['/apple-touch-icon.png', 'apple-touch-icon.png', 'image/png']].map(([u, f, t]) => [u, { body: fs.readFileSync(path.join(WEB, f)), type: t }]));
 STATIC['/index.html'] = STATIC['/'];
 // cache-bust: script/style URLs carry a content hash, so a deploy is picked up immediately despite max-age caching
@@ -18,6 +18,7 @@ const ver = (f) => crypto.createHash('sha1').update(STATIC[f].body).digest('hex'
 STATIC['/'].body = Buffer.from(STATIC['/'].body.toString()
   .replace('/robot-deployment-index/app.js"', `/robot-deployment-index/app.js?v=${ver('/app.js')}"`)
   .replace('/robot-deployment-index/rdi.js"', `/robot-deployment-index/rdi.js?v=${ver('/rdi.js')}"`)
+  .replace('/robot-deployment-index/ph.js"', `/robot-deployment-index/ph.js?v=${ver('/ph.js')}"`)
   .replace('/robot-deployment-index/subscribe.js"', `/robot-deployment-index/subscribe.js?v=${ver('/subscribe.js')}"`));
 
 // ---- submissions: validate, rate-limit per IP, store privately ----

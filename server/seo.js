@@ -65,7 +65,7 @@ q{color:#52514e;font-size:13.5px;display:block;margin-top:3px}
 .cta{display:inline-block;margin-top:26px;background:#0b0b0b;color:#fcfcfb;border-radius:999px;padding:9px 18px;font-weight:600;font-size:14px}
 .cta:hover{text-decoration:none;background:#33332f}
 ul.az{columns:2;padding:0;list-style:none}ul.az li{padding:3px 0;break-inside:avoid}
-</style></head><body><main>
+</style><script src="/robot-deployment-index/ph.js"></script></head><body><main>
 <div class="top"><a href="${BASE}"><b>Robot Deployment Index</b></a><a href="${BASE}/companies">All companies</a></div>
 ${body}
 <p class="muted" style="margin-top:40px">Robots = the largest credible public claim of units shipped, deployed or in fleet. Orders, pilots and production capacity never count. Updated ${esc(when(built) || built)}.</p>

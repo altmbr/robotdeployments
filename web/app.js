@@ -339,7 +339,16 @@
         this.setState((s) => s.sub ? (s.sub.ac ? { sub: { ...s.sub, ac: false } } : { sub: null }) : s.menu ? { menu: null, menuQ: '' } : { sel: null }); };
       window.addEventListener('keydown', this.onKey);
     }
-    componentDidUpdate() {
+    componentDidUpdate(_, prev) {
+      // PostHog (web/ph.js; no-op off altmbr.com): panel opens + filter changes, alongside altmbr.com's analytics
+      const ph = window.posthog, st = this.state;
+      if (ph) {
+        if (st.sel && (!prev.sel || prev.sel.company !== st.sel.company)) ph.capture('rdi_company_opened', { company: st.sel.company });
+        ['cat', 'vertical', 'usecase', 'funding', 'period', 'country', 'exCountry', 'groupBy', 'colorBy', 'view', 'subset'].forEach((k) => {
+          if (prev[k] !== st[k]) ph.capture('rdi_filter_changed', { filter: k, value: st[k] });
+        });
+        if (st.q.trim() && st.q !== prev.q) { clearTimeout(this.qT); this.qT = setTimeout(() => ph.capture('rdi_search', { q: this.state.q.trim() }), 1200); }
+      }
       const o = {}; PERSIST.forEach((k) => { o[k] = this.state[k]; });
       try { localStorage.setItem('rdi-index-v2', JSON.stringify(o)); } catch (e) {}
     }
@@ -395,6 +404,7 @@
           if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'failed');
           try { if (rec.name || rec.email) localStorage.setItem('rdi-submitter', JSON.stringify({ name: rec.name, email: rec.email })); } catch (e) {}
           this.subUp({ done: true, sending: false, units: R.fmt(n) });
+          try { window.posthog && window.posthog.capture('rdi_company_submitted', { company: rec.company, is_new: !rec.existing }); } catch (e) {}
         } catch (e) {
           this.subUp({ sending: false, err: e.message === 'rate_limited' ? 'Too many submissions from here. Try again later.' : 'Couldn’t send that. Please try again.' });
         }

@@ -8,6 +8,8 @@
   const dismissed = () => { try { return !!sessionStorage.getItem(DISMISS_KEY); } catch (e) { return false; } };
   const markDismissed = () => { try { sessionStorage.setItem(DISMISS_KEY, '1'); } catch (e) {} };
   if (hasCookie()) return;
+  // same event names as altmbr.com's footer/popup, so they share one PostHog funnel
+  const ph = (ev, props) => { try { window.posthog && window.posthog.capture(ev, props); } catch (e) {} };
 
   const css = `
 .subfooter{position:fixed;left:0;right:0;bottom:0;z-index:50;padding:13px 24px;background:#edf1fb;border-top:1px solid #d8e0f4;animation:subfooter-up .35s ease-out both;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
@@ -45,27 +47,33 @@
   const el = (tag, cls, attrs) => { const e = document.createElement(tag); if (cls) e.className = cls; Object.assign(e, attrs || {}); return e; };
 
   // Shared submit: POST the email, show the server's error or the "check your inbox" state.
-  async function submit(input, btn, errEl, onSent) {
+  async function submit(input, btn, errEl, onSent, source) {
     btn.disabled = input.disabled = true; btn.textContent = '…'; errEl.textContent = '';
     try {
       const res = await fetch('/api/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: input.value }) });
-      if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error || 'something went wrong'); }
+      if (!res.ok) { const d = await res.json().catch(() => ({})); ph('subscribe_error', { reason: d.error || 'http_' + res.status, source }); throw new Error(d.error || 'something went wrong'); }
+      const email = input.value.trim().toLowerCase();
+      try { window.posthog && window.posthog.identify(email, { email }); } catch (e) {}
+      ph('subscribe_submitted', { email, source });
       markDismissed(); onSent();
     } catch (e) {
+      if (e.message === 'Failed to fetch') ph('subscribe_error', { reason: 'network', source });
       errEl.textContent = e.message === 'Failed to fetch' ? 'network error — try again' : e.message;
       btn.disabled = input.disabled = false; btn.textContent = 'subscribe →';
     }
   }
-  const emailInput = (cls) => el('input', cls, { type: 'email', inputMode: 'email', autocomplete: 'email', required: true, placeholder: 'you@email.com', ariaLabel: 'Email address' });
+  const emailInput = (cls, source) => { const i = el('input', cls, { type: 'email', inputMode: 'email', autocomplete: 'email', required: true, placeholder: 'you@email.com', ariaLabel: 'Email address' });
+    i.addEventListener('focus', () => ph('subscribe_focused', { source }), { once: true }); return i; };
 
   function footer() {
     const bar = el('div', 'subfooter', { role: 'region', ariaLabel: 'Subscribe' }), inner = el('div', 'subfooter-inner');
     const msg = el('span', 'subfooter-msg', { textContent: 'i write maybetheway. join the list to get notified when i publish.' });
-    const form = el('form', 'subfooter-form'), input = emailInput('subfooter-input'), btn = el('button', 'subfooter-btn', { type: 'submit', textContent: 'subscribe →' });
+    const form = el('form', 'subfooter-form'), input = emailInput('subfooter-input', 'footer'), btn = el('button', 'subfooter-btn', { type: 'submit', textContent: 'subscribe →' });
     const err = el('span', 'subfooter-err');
     form.append(input, btn); inner.append(msg, form, err); bar.append(inner);
-    form.onsubmit = (e) => { e.preventDefault(); submit(input, btn, err, () => { inner.replaceChildren(el('span', 'subfooter-msg', { textContent: 'check your inbox to confirm →' })); }); };
+    form.onsubmit = (e) => { e.preventDefault(); submit(input, btn, err, () => { inner.replaceChildren(el('span', 'subfooter-msg', { textContent: 'check your inbox to confirm →' })); }, 'footer'); };
     document.body.append(bar);
+    ph('subscribe_footer_viewed', { reason: 'form', source: 'footer' });
     // keep the page's last row (legend, footer links) clear of the fixed bar
     const pad = () => { document.body.style.paddingBottom = bar.offsetHeight + 'px'; };
     pad(); window.addEventListener('resize', pad);
@@ -76,27 +84,28 @@
     const scrim = el('div', 'subpop-scrim'), card = el('div', 'subpop-card', { role: 'dialog' });
     card.setAttribute('aria-modal', 'true'); card.setAttribute('aria-labelledby', 'subpop-h');
     const prevFocus = document.activeElement, prevOverflow = document.body.style.overflow;
-    const close = () => { markDismissed(); scrim.remove(); document.body.style.overflow = prevOverflow; document.removeEventListener('keydown', onKey, true); if (prevFocus && prevFocus.focus) prevFocus.focus(); };
+    const close = (method) => { ph('subscribe_popup_dismissed', { method }); markDismissed(); scrim.remove(); document.body.style.overflow = prevOverflow; document.removeEventListener('keydown', onKey, true); if (prevFocus && prevFocus.focus) prevFocus.focus(); };
     const onKey = (e) => {
-      if (e.key === 'Escape') { e.stopPropagation(); close(); return; }
+      if (e.key === 'Escape') { e.stopPropagation(); close('esc'); return; }
       if (e.key !== 'Tab') return;
       const f = card.querySelectorAll('button:not([disabled]), input:not([disabled])'); if (!f.length) return;
       if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f[f.length - 1].focus(); }
       else if (!e.shiftKey && document.activeElement === f[f.length - 1]) { e.preventDefault(); f[0].focus(); }
     };
-    const x = el('button', 'subpop-close', { type: 'button', textContent: '×', ariaLabel: 'Close', onclick: close });
+    const x = el('button', 'subpop-close', { type: 'button', textContent: '×', ariaLabel: 'Close', onclick: () => close('close') });
     const h = el('h2', 'subpop-h', { id: 'subpop-h' }); h.innerHTML = 'don&rsquo;t miss <em>the next one</em>.';
     const p = el('p', 'subpop-p', { textContent: 'my essays on investing and building, straight to your inbox every so often. unsubscribe anytime.' });
-    const form = el('form', 'subpop-form'), input = emailInput('subpop-input'), btn = el('button', 'subpop-btn', { type: 'submit', textContent: 'subscribe →' });
-    const err = el('span', 'subpop-err'), later = el('button', 'subpop-later', { type: 'button', textContent: 'maybe later', onclick: close });
+    const form = el('form', 'subpop-form'), input = emailInput('subpop-input', 'popup'), btn = el('button', 'subpop-btn', { type: 'submit', textContent: 'subscribe →' });
+    const err = el('span', 'subpop-err'), later = el('button', 'subpop-later', { type: 'button', textContent: 'maybe later', onclick: () => close('later') });
     form.append(input, btn);
-    form.onsubmit = (e) => { e.preventDefault(); submit(input, btn, err, () => card.replaceChildren(x, el('div', 'subpop-eyebrow', { textContent: 'maybetheway' }), el('p', 'subpop-msg', { textContent: 'check your inbox to confirm →' }))); };
+    form.onsubmit = (e) => { e.preventDefault(); submit(input, btn, err, () => card.replaceChildren(x, el('div', 'subpop-eyebrow', { textContent: 'maybetheway' }), el('p', 'subpop-msg', { textContent: 'check your inbox to confirm →' })), 'popup'); };
     card.append(x, el('div', 'subpop-eyebrow', { textContent: 'maybetheway' }), h, p, form, err, later);
     scrim.append(card);
-    scrim.onmousedown = (e) => { if (e.target === scrim) close(); };
+    scrim.onmousedown = (e) => { if (e.target === scrim) close('scrim'); };
     document.addEventListener('keydown', onKey, true);
     document.body.style.overflow = 'hidden';
     document.body.append(scrim);
+    ph('subscribe_popup_shown');
     requestAnimationFrame(() => input.focus());
   }
 
