@@ -118,6 +118,7 @@ for k, cs in by_co.items():
     geo = defaultdict(float)
     if best:
         for g in best.get('geo') or []:
+            if isinstance(g, str): g = {'region': g}  # some agents write geo as ["US", ...]
             r = g.get('region');
             if not r: continue
             if g.get('count'): geo[r] += num(g['count']) or 0
