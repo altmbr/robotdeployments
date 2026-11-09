@@ -15,10 +15,14 @@ slug = lambda s: re.sub(r'[^a-z0-9]+', '_', s.lower()).strip('_')[:60] or 'x'
 
 s = open(f'{ROOT}/viz/data.js').read(); D = json.loads(s[s.index('{'):s.rindex('}') + 1])
 targets = [r for r in D['companies'] if r.get('funded_12m') and not r.get('units')]
+TF = arg('--targets', None)  # JSON list of companies (e.g. data/deploy_hunt_targets_4.json): hunt those still without a count
+if TF:
+    want = {t['company'] for t in json.load(open(TF if TF.startswith('/') else f'{ROOT}/{TF}'))}
+    targets = [r for r in D['companies'] if r['company'] in want and not r.get('units')]
 if ONLY: targets = [r for r in targets if r['company'] == ONLY]
 
 # founders + already-viewed sources from the deploy-hunt ledger
-FOUND, VIEWED = {}, {}
+FOUND, VIEWED, LEADS = {}, {}, {}
 for f in glob.glob(f'{ROOT}/research/ledger/*.jsonl'):
     for line in open(f, errors='ignore'):
         try: x = json.loads(line)
@@ -31,14 +35,18 @@ for f in glob.glob(f'{ROOT}/research/ledger/*.jsonl'):
             FOUND.setdefault(x['company'], {})[n] = f"{n} ({role}{'; also ' + sp if sp else ''})"
         for v in x.get('viewed') or []:
             u = v.get('url') if isinstance(v, dict) else str(v)
-            if u: VIEWED.setdefault(x['company'], []).append(u)
+            if u and 'news.google.com' not in u: VIEWED.setdefault(x['company'], []).append(u)
+            if isinstance(v, dict) and v.get('had_number') and v.get('title'): LEADS.setdefault(x['company'], []).append(str(v['title'])[:160])
+        for l in x.get('next_leads') or []: LEADS.setdefault(x['company'], []).append(str(l)[:160])
 
-PROMPT = """You are researching for the Robot Deployment Index (a credible database of physical robots SHIPPED or DEPLOYED, by company). Today is 2026-11-05.
+PROMPT = """You are researching for the Robot Deployment Index (a credible database of physical robots SHIPPED or DEPLOYED, by company). Today is 2026-11-09.
 Company: {company}
 Website: {website}   HQ: {hq}
 What they sell: {offering}
 Known founders/execs: {founders}
 Sources we already checked that had NO number (find others): {viewed}
+Leads (headlines / hints found earlier that we could not open; check them first): {leads}
+{local}
 
 TASK: find any public number for how many of THIS company's own physical robots/units are deployed, shipped, delivered, sold, installed, or operating in the field (a fleet count, cumulative units, robots at customer sites). Search hard:
 1. web_search the company (English and local-language name), its press/news pages, funding announcements (these often say "X robots deployed"), customer case studies, trade press, Chinese/Japanese/Korean media where relevant.
@@ -49,12 +57,20 @@ Rules: only count units of the company's OWN robots (not robots of other brands 
 Reply with ONLY a JSON object, no prose:
 {{"company": "{company}", "claims": [{{"count": <integer>, "metric": "cumulative_shipped|cumulative_deployed|deployed_active|fleet_size|installed_base|orders_or_backlog|pilot_units|production_capacity", "quote": "...", "source_url": "https://...", "as_of": "YYYY-MM", "speaker": "name/role or null", "source_type": "news|company_pr|company_site|x_post|podcast|interview", "own_robots": true}}], "founders_searched": ["..."], "queries": ["..."], "next_leads": ["..."], "notes": "..."}}"""
 
+LOCAL = {
+ 'CN': 'LOCAL LANGUAGE: search in Chinese with the Chinese name (e.g. "<名> 台", 累计出货/交付/部署/落地/销量/装机/保有量; 订单 = orders). Check IPO prospectuses (HKEX/STAR 招股书), ofweek, 高工机器人, 36kr, sina/sohu/163, the company 新闻中心. Quote the Chinese original.',
+ 'JP': 'LOCAL LANGUAGE: search in Japanese (導入台数, 累計出荷, 稼働台数, 販売台数, 台). Check PR TIMES releases, robotstart.info, Nikkei. Quote the Japanese original.',
+ 'KR': 'LOCAL LANGUAGE: search in Korean (누적 판매, 보급, 공급, 도입, 대). Check irobotnews.com, etnews, zdnet.co.kr, DART filings. Quote the Korean original.',
+ 'DE': 'Also search German press (im Einsatz, ausgeliefert, installiert, Anlagen).', 'AT': 'Also search German/Austrian press (im Einsatz, ausgeliefert, installiert).',
+ 'CH': 'Also search Swiss German/French press (startupticker.ch; im Einsatz, ausgeliefert, installiert).', 'IN': 'Check Indian press (Economic Times, Inc42, Entrackr, YourStory) and government orders.'}
+
 def call(r):
     out = f"{RAW}/{slug(r['company'])}.json"
     if os.path.exists(out): return r['company'], 'cached', 0
     fs = list(FOUND.get(r['company'], {}).values())[:6]
     p = PROMPT.format(company=r['company'], website=r.get('website') or '?', hq=r.get('hq') or '?', offering=r.get('offering') or '?',
-                      founders='; '.join(fs) or 'unknown: find them first', viewed=', '.join(VIEWED.get(r['company'], [])[:12]) or 'none')
+                      founders='; '.join(fs) or 'unknown: find them first', viewed=', '.join(VIEWED.get(r['company'], [])[:12]) or 'none',
+                      leads=' | '.join(LEADS.get(r['company'], [])[:8]) or 'none', local=LOCAL.get(r.get('hq'), ''))
     body = json.dumps({'model': MODEL, 'tools': [{'type': 'web_search'}, {'type': 'x_search'}],
                        'input': [{'role': 'user', 'content': p}]}).encode()
     for attempt in range(3):

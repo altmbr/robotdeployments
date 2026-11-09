@@ -55,9 +55,18 @@ for r in rows:
         'claims': [{'count': c.get('count'), 'metric': c.get('metric'), 'as_of': c.get('as_of'), 'type': c.get('source_type'),
                     'url': '(private research)' if (c.get('source_url') or '').startswith(('/', '~')) else c.get('source_url'), 'quote': (c.get('quote') or '')[:220], 'conf': c.get('confidence')} for c in cl],
     })
+# Investor display names: one canonical name per entity (data/investor_aliases.json, variant -> canonical),
+# e.g. "Sequoia China" / "红杉中国" -> "HongShan (红杉中国)". Deduped after mapping.
+try: INV_ALIAS = {k: v for k, v in json.load(open(f'{ROOT}/data/investor_aliases.json')).items() if not k.startswith('_')}
+except FileNotFoundError: INV_ALIAS = {}
 def names(v):
     v = v if isinstance(v, list) else [v] if v else []
-    return [s.strip() for s in (x if isinstance(x, str) else str((x or {}).get('name', '')) if isinstance(x, dict) else str(x) for x in v) if s and s.strip()]
+    out = []
+    for s in (x if isinstance(x, str) else str((x or {}).get('name', '')) if isinstance(x, dict) else str(x) for x in v):
+        s = (s or '').strip()
+        if s: s = INV_ALIAS.get(s, s)
+        if s and s not in out: out.append(s)
+    return out
 # ---- Enrichment: taxonomy tags + funding rounds (research/enrich/*.jsonl, see research/TAXONOMY.md) ----
 def nkey(s):
     raw = s
@@ -83,6 +92,20 @@ V_NAMES = {'logistics_warehousing': 'Logistics & warehousing', 'retail_grocery':
     'construction': 'Construction', 'energy_mining_utilities': 'Energy, mining & utilities', 'defense_public_safety': 'Defense & public safety',
     'consumer': 'Consumer', 'education_research': 'Education & research', 'other': 'Other'}
 STAGE_ORDER = ['pre_seed', 'seed', 'series_a', 'series_b', 'series_c', 'series_d_plus', 'growth', 'debt', 'grant', 'ipo']
+# Currency fixes (research/verify/fx_fixes*.jsonl): a sourced round whose amount_usd was left in local currency or
+# converted wrongly. Keyed by (company, month, old amount); applied to every enrichment record before rounds merge.
+FX_FIX = {}
+for f in sorted(glob.glob(f'{ROOT}/research/verify/fx_fixes*.jsonl')):
+    for line in open(f, errors='ignore'):
+        try: x = json.loads(line)
+        except Exception: continue
+        if x.get('verdict') == 'fix' and x.get('company') and isinstance(x.get('old_amount_usd'), (int, float)):
+            FX_FIX[(x['company'], str(x.get('date'))[:7], x['old_amount_usd'])] = x.get('amount_usd')
+def fx_fix(e):
+    for r in e.get('funding_rounds') or []:
+        if isinstance(r, dict):
+            k = (e.get('company'), str(r.get('date'))[:7], r.get('amount_usd'))
+            if k in FX_FIX: r['amount_usd'] = FX_FIX[k]
 enrich = {}
 for f in sorted(glob.glob(f'{ROOT}/research/enrich/*.jsonl')):
     for line in open(f, errors='ignore'):
@@ -91,6 +114,7 @@ for f in sorted(glob.glob(f'{ROOT}/research/enrich/*.jsonl')):
         try: e = json.loads(line)
         except Exception: continue
         if not e.get('company'): continue
+        fx_fix(e)  # before canon: fixes are keyed by the name as written
         e['company'] = canon(e['company'])
         k = nkey(e['company'])
         prev = enrich.get(k)

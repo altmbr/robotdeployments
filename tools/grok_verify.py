@@ -18,6 +18,16 @@ def parse(text):
         try: return json.loads(re.sub(r',\s*([}\]])', r'\1', m.group(0)))
         except Exception: return None
 
+def decode(b, hdr):
+    # Chinese/Korean/Japanese sites often serve GBK / EUC-KR / Shift-JIS: header charset, then <meta charset>, then UTF-8
+    m = re.search(rb'charset=["\']?([A-Za-z0-9_-]+)', b[:4000])
+    for cs in [hdr, m.group(1).decode() if m else None, 'utf-8']:
+        if not cs: continue
+        cs = {'gb2312': 'gb18030', 'gbk': 'gb18030'}.get(cs.lower(), cs)
+        try: return b.decode(cs)
+        except Exception: pass
+    return b.decode('utf-8', 'ignore')
+
 def fetch(url):
     f = f"{REC}/{hashlib.sha1(url.encode()).hexdigest()[:16]}.txt"
     if os.path.exists(f): return open(f).read(), f
@@ -27,7 +37,8 @@ def fetch(url):
             d = json.load(urllib.request.urlopen(urllib.request.Request(f'https://api.fxtwitter.com/{m.group(1)}/status/{m.group(2)}', headers={'User-Agent': 'Mozilla/5.0'}), timeout=30))
             t = (d.get('tweet') or {}); txt = f"@{(t.get('author') or {}).get('screen_name')} {t.get('created_at')}: {t.get('text', '')}"
         else:
-            raw = urllib.request.urlopen(urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Macintosh) AppleWebKit/537.36 Chrome/124 Safari/537.36', 'Accept-Language': 'en-US,en;q=0.9'}), timeout=30).read().decode('utf-8', 'ignore')
+            resp = urllib.request.urlopen(urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Macintosh) AppleWebKit/537.36 Chrome/124 Safari/537.36', 'Accept-Language': 'en-US,en;q=0.9'}), timeout=30)
+            raw = decode(resp.read(), resp.headers.get_content_charset())
             raw = re.sub(r'(?is)<(script|style|noscript)[^>]*>.*?</\1>', ' ', raw)
             txt = re.sub(r'\s+', ' ', html.unescape(re.sub(r'(?s)<[^>]+>', ' ', raw))).strip()
     except Exception as e:
@@ -37,7 +48,7 @@ def fetch(url):
 def forms(n):
     out = {f'{n:,}', str(n), f'{n:,}'.replace(',', '.'), f'{n:,}'.replace(',', ' ')}
     if n >= 1000: out |= {f'{n/1000:g}k', f'{n/1000:g} thousand', f'{n/1000:g},000'}
-    if n >= 10000: out |= {f'{n/10000:g}万'}
+    if n >= 10000: out |= {f'{n/10000:g}万', f'{n/10000:g}만', f'{n/10000:g}萬'}
     if n >= 1e6: out |= {f'{n/1e6:g} million'}
     return out
 
@@ -54,6 +65,10 @@ def check(c):
     if not txt or len(txt) < 200 and 'status' not in url: return 'fetch_failed', None
     t, q = norm(txt), norm(c.get('quote')); w = q.split()
     qok = bool(w) and (' '.join(w[:8]) in t or (len(w) >= 5 and sum(' '.join(w[i:i+5]) in t for i in range(len(w) - 4)) / (len(w) - 4) >= .6))
+    if not qok and re.search(r'[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]', q):  # CJK: no spaces, so compare 10-char shingles
+        tc, qc = t.replace(' ', ''), q.replace(' ', '')
+        sh = [qc[i:i + 10] for i in range(max(1, len(qc) - 9))]
+        qok = len(qc) >= 10 and sum(x in tc for x in sh) / len(sh) >= .6
     nok = any(f.lower() in txt.lower() for f in forms(n))
     st = 'verified' if qok and nok else 'quote_only' if qok else 'number_only' if nok else 'not_on_page'
     return st, os.path.relpath(rec, ROOT)
@@ -71,6 +86,13 @@ LOWQ = ('robottoday.com', 'droidage.com', 'originofbots.com', 'mlq.ai', 'tech-in
 ACCEPT = {('Deyi Medical (德壹医疗)', 1000), ('Direct Drive Tech', 1000), ('Kewazo', 12), ('Lawnics Technology', 1000),
           ('Niuer Commercial Robotics', 500), ('Noematrix (穹彻智能)', 100), ('Zhishi Robotics (智世机器人)', 1000)}
 FIX = {('Lawnics Technology', 10000): 1000, ('FlyFocus', 300): 100}                                          # "kilkaset" = several hundred -> floor 100
+# Per-claim review 2026-11-09 (Claude, read every verified claim for the CN/JP/KR/IN/DACH additions): (company, count) -> reason
+REJECT_CLAIM = {('Zero One Auto (零一汽车)', n): 'human-driven EV heavy trucks, not the driverless-ready units' for n in (2, 272, 1176, 778, 1002)}
+REJECT_CLAIM.update({('Bolei Technology (伯镭科技)', 188): 'one year, not cumulative', ('Bolei Technology (伯镭科技)', 259): 'nine months, not cumulative',
+  ('Bolei Technology (伯镭科技)', 2000): '近2000 = nearly 2,000 (below it)', ('Dadao Zhichuang (大道智创)', 1000): '近千台 = nearly 1,000',
+  ('Haishou Unmanned Boat (海舶无人船)', 50): '几十条 = dozens, no number', ('Hangtian Feipeng (航天飞鹏)', 200): '数百架 = hundreds, no number',
+  ('Nabai Robotics (纳百机器人)', 6): 'source is Neptune Robotics; same company not confirmed',
+  ('Yuequan Bionics (月泉仿生)', 10000): 'dexterous hands = components', ('Yuequan Bionics (月泉仿生)', 13000): 'dexterous hands = components'})
 rows = []
 for f in sorted(glob.glob(f'{ROOT}/research/grok/raw/*.json')):
     d = json.load(open(f)); p = parse(d['text'])
@@ -79,6 +101,7 @@ for f in sorted(glob.glob(f'{ROOT}/research/grok/raw/*.json')):
         c['company'] = d['company']; rows.append(c)
 for r in rows:
     if r['company'] in REJECT: r['status'], r['review'] = 'rejected', REJECT[r['company']]
+    elif (r['company'], r.get('count')) in REJECT_CLAIM: r['status'], r['review'] = 'rejected', REJECT_CLAIM[(r['company'], r.get('count'))]
     elif any(b in (r.get('source_url') or '') for b in BLOCK): r['status'], r['review'] = 'rejected', 'content-farm source'
 cl = [r for r in rows if 'status' not in r]
 with cf.ThreadPoolExecutor(16) as ex:

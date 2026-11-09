@@ -66,7 +66,7 @@ for vf in sorted(glob.glob(f'{ROOT}/research/verify/*.jsonl')):
         if v.get('file') is not None and v.get('line') is not None: OVR[f"{os.path.basename(v['file'])}:{v['line']}"] = v
 for _v, _c in json.load(open(f'{ROOT}/data/company_aliases.json')).items():  # shared same-company aliases
     if not _v.startswith('_'): ALIASES[norm(_v)] = _c; ALIASES.setdefault(norm(_c), _c)
-claims, bad, dups, seen, rejected = [], 0, 0, set(), 0
+claims, bad, dups, seen, rejected, held_gn = [], 0, 0, set(), 0, 0
 for f in sorted(glob.glob(f'{ROOT}/research/claims/*.jsonl')):
     for li, line in enumerate(open(f, errors='ignore')):
         line = line.strip().rstrip(',')
@@ -82,7 +82,9 @@ for f in sorted(glob.glob(f'{ROOT}/research/claims/*.jsonl')):
                     if v.get('fixed_' + k2) not in (None, ''): c[k2] = v['fixed_' + k2]
             c['verified'] = v.get('verdict')
         c['count'] = num(c.get('count'))
-        sig = (norm(c.get('company')), c.get('metric'), c['count'], str(c.get('as_of')), (c.get('source_url') or '')[:120])
+        # a news.google.com redirect is not a citation: hold the claim until its publisher URL is resolved
+        if 'news.google.com' in (c.get('source_url') or ''): held_gn += 1; continue
+        sig =(norm(c.get('company')), c.get('metric'), c['count'], str(c.get('as_of')), (c.get('source_url') or '')[:120])
         if sig in seen: dups += 1; continue
         seen.add(sig); claims.append(c)
 
@@ -163,6 +165,6 @@ for b in ('autonomous', 'industrial', 'healthcare', 'consumer'):
                         'by_confidence': dict(conf),
                         'top20': [(r['company'], r['best_count'], r['best_metric'], r['as_of']) for r in rs[:20]]}
 json.dump(agg, open(f'{ROOT}/data/aggregates.json', 'w'), indent=1)
-print("review-rejected claims:", rejected)
+print("review-rejected claims:", rejected, "| held (news.google.com source):", held_gn)
 print(json.dumps({k: v for k, v in agg.items() if k != 'boards'}))
 for b, v in agg['boards'].items(): print(b, v['total'], v['companies'], list(v['by_hq_country'].items())[:5])
