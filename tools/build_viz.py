@@ -75,7 +75,7 @@ UC_NAMES = {'move_goods_indoor': 'Moving goods indoors', 'storage_retrieval': 'S
     'passenger_transport': 'Passenger transport', 'freight_haul': 'Freight hauling', 'crop_application': 'Spraying & planting',
     'crop_care_harvest': 'Crop care & harvest', 'livestock': 'Livestock & dairy', 'construction_tasks': 'Construction tasks',
     'surgery_clinical': 'Surgery & clinical', 'assist_rehab': 'Assistance & rehab', 'lab_automation': 'Lab automation',
-    'defense_strike': 'Defense & strike', 'household_chores': 'Household chores', 'general_purpose': 'General purpose', 'other': 'Other'}
+    'defense_strike': 'Defense', 'household_chores': 'Household chores', 'general_purpose': 'General purpose', 'other': 'Other'}
 V_NAMES = {'logistics_warehousing': 'Logistics & warehousing', 'retail_grocery': 'Retail & grocery', 'manufacturing': 'Manufacturing',
     'food_processing': 'Food processing', 'agriculture_crops': 'Agriculture: crops', 'agriculture_livestock': 'Agriculture: livestock',
     'healthcare': 'Healthcare', 'life_sciences': 'Life sciences', 'hospitality_food_service': 'Hospitality & food service',
