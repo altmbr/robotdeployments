@@ -110,6 +110,9 @@ for f in sorted(glob.glob(f'{ROOT}/research/enrich/*.jsonl')):
                     for f in ('lead_investors', 'investors'):
                         x[f] = names(x.get(f)) + [n for n in names(r.get(f)) if n.lower() not in {m.lower() for m in names(x.get(f))}]
                     if x.get('amount_usd') is None and kk[1] is not None: x['amount_usd'] = kk[1]
+                    # a real article beats a news-search link (link-fix records re-report the round to swap its source)
+                    if 'news.google.com' in (x.get('source_url') or '') and r.get('source_url') and 'news.google.com' not in r['source_url']:
+                        x['source_url'], x['quote'] = r['source_url'], r.get('quote') or x.get('quote')
                     rs[i] = x; break
         base = dict(base); base['funding_rounds'] = rs
         for f in ('website', 'hq_country', 'offering', 'status', 'total_raised_usd'):

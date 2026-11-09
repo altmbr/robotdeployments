@@ -69,6 +69,10 @@ Add a company only if public sources confirm it exists as a robotics company (st
 log the rest in `private/granola_cos/not_published.jsonl`. Never hint at sources in public commit messages.
 
 ## Research workflows
+- Funding: rounds carry `lead_investors` + `investors` (every participant). Best sources and how to reach them:
+  `research/funding_sources.md` (Crunchbase News API, Robot Report feed, PostRound, SEC Form D). Cite the article,
+  never a news.google.com search URL. build_viz collapses duplicate rounds (same stage + month).
+- Duplicate companies: same website = same company (misspellings from transcripts, e.g. Locust/Locus) -> alias, don't add.
 - WebSearch has a shared ~200-call session budget: one long background workflow (e.g. the X-handle hunt) starves every
   other research run. Don't run search-heavy workflows in parallel; never scrape search engines to get around it.
 - Fund-portfolio sweeps: one agent per fund → dedupe vs `data/companies.csv` + aliases → research batches of 5.
