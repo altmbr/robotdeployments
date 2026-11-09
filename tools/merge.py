@@ -66,6 +66,11 @@ for vf in sorted(glob.glob(f'{ROOT}/research/verify/*.jsonl')):
         if v.get('file') is not None and v.get('line') is not None: OVR[f"{os.path.basename(v['file'])}:{v['line']}"] = v
 for _v, _c in json.load(open(f'{ROOT}/data/company_aliases.json')).items():  # shared same-company aliases
     if not _v.startswith('_'): ALIASES[norm(_v)] = _c; ALIASES.setdefault(norm(_c), _c)
+GN_RESOLVED = {}  # news.google.com article link -> publisher URL (tools/gn_resolve_claims.py)
+if os.path.exists(f'{ROOT}/research/verify/gn_resolved.jsonl'):
+    for _l in open(f'{ROOT}/research/verify/gn_resolved.jsonl'):
+        try: _x = json.loads(_l); GN_RESOLVED[_x['gn']] = _x['url']
+        except Exception: pass
 claims, bad, dups, seen, rejected, held_gn = [], 0, 0, set(), 0, 0
 for f in sorted(glob.glob(f'{ROOT}/research/claims/*.jsonl')):
     for li, line in enumerate(open(f, errors='ignore')):
@@ -82,8 +87,9 @@ for f in sorted(glob.glob(f'{ROOT}/research/claims/*.jsonl')):
                     if v.get('fixed_' + k2) not in (None, ''): c[k2] = v['fixed_' + k2]
             c['verified'] = v.get('verdict')
         c['count'] = num(c.get('count'))
-        # a news.google.com redirect is not a citation: hold the claim until its publisher URL is resolved
-        if 'news.google.com' in (c.get('source_url') or ''): held_gn += 1; continue
+        # a news.google.com redirect is not a citation: swap in the resolved publisher URL, else hold the claim
+        if c.get('source_url') in GN_RESOLVED: c['source_url'] = GN_RESOLVED[c['source_url']]
+        if'news.google.com' in (c.get('source_url') or ''): held_gn += 1; continue
         sig =(norm(c.get('company')), c.get('metric'), c['count'], str(c.get('as_of')), (c.get('source_url') or '')[:120])
         if sig in seen: dups += 1; continue
         seen.add(sig); claims.append(c)

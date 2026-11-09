@@ -262,14 +262,17 @@ for r in out + gone:
         if r.get(many) and r.get(one_) not in r[many]: r[one_] = r[many][0]
     r.setdefault('use_cases', []); r.setdefault('verticals', []); r.setdefault('rounds', []); r.setdefault('funded_12m', False)
 print(f'enriched {n_enriched}/{len(out)} companies; funded last 12m: {sum(r["funded_12m"] for r in out)}')
-# ---- official X handles (research/handles/out/*.jsonl from the handle hunt; last line per company wins).
+# ---- official X handles (research/handles/out/*.jsonl; last line per company wins, but confirmed beats unconfirmed).
 # Only 'confirmed' handles (site links the account, or the account links the company's domain) are attached.
 XH = {}
 for f in sorted(glob.glob(f'{ROOT}/research/handles/out/*.jsonl')):
     for line in open(f, errors='ignore'):
         try: v = json.loads(line)
         except Exception: continue
-        if v.get('company'): XH[canon(v['company'])] = v
+        if not v.get('company'): continue
+        k = canon(v['company'])
+        # a confirmed handle is never overwritten by a later hunt's 'no_account'/'likely' line for the same company
+        if v.get('status') == 'confirmed' or (XH.get(k) or {}).get('status') != 'confirmed': XH[k] = v
 for r in out + gone:
     v = XH.get(r['company'])
     if v and v.get('status') == 'confirmed' and v.get('handle'): r['x_handle'] = v['handle'].lstrip('@')

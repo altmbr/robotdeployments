@@ -79,6 +79,8 @@ REJECT = {'AGILINK': 'dexterous hands = components, not robots', 'Inspire Robots
   'OneRobotics': '5M = smart-home devices (SwitchBot-style), not robots; 1,100 = tennis courts', 'Deft': 'stock page text, not a shipped count',
   'Draganfly': 'an order for 30, not shipped', 'Reliable Robotics': '6 piloted Cessnas in its airline, not autonomous units',
   'DeepWay (深向科技)': 'EV heavy trucks, human-driven', 'OYMotion (傲意科技)': '3,000 users of bionic prosthetic hands, not robots',
+ 'Aether Biomedical': 'bionic prosthetic hands (same ruling as OYMotion), not robots',
+  'AutoNxt Automation': 'electric tractors, mostly human-driven (same ruling as DeepWay)',
   'Neuro Robotics': 'Forbes says the CEO is vague on units; no stated count', 'Turing (Japan)': 'one human-driven car sold', 'Anduril': 'Sentry towers are fixed sensors, not robots'}
 BLOCK = ('aiwiki.ai', 'hypersinc.com', 'theagenttimes.com')            # AI-generated content farms
 LOWQ = ('robottoday.com', 'droidage.com', 'originofbots.com', 'mlq.ai', 'tech-insider.org', 'lavx.hu', 'humanoidroboticstechnology.com', 'cryptobriefing.com')
