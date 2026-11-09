@@ -55,6 +55,9 @@ for r in rows:
         'claims': [{'count': c.get('count'), 'metric': c.get('metric'), 'as_of': c.get('as_of'), 'type': c.get('source_type'),
                     'url': '(private research)' if (c.get('source_url') or '').startswith(('/', '~')) else c.get('source_url'), 'quote': (c.get('quote') or '')[:220], 'conf': c.get('confidence')} for c in cl],
     })
+def names(v):
+    v = v if isinstance(v, list) else [v] if v else []
+    return [s.strip() for s in (x if isinstance(x, str) else str((x or {}).get('name', '')) if isinstance(x, dict) else str(x) for x in v) if s and s.strip()]
 # ---- Enrichment: taxonomy tags + funding rounds (research/enrich/*.jsonl, see research/TAXONOMY.md) ----
 def nkey(s):
     raw = s
@@ -99,11 +102,24 @@ for f in sorted(glob.glob(f'{ROOT}/research/enrich/*.jsonl')):
         for r in rs: keys.add((str(r.get('date'))[:7], r.get('amount_usd')))
         for r in other.get('funding_rounds') or []:
             kk = (str(r.get('date'))[:7], r.get('amount_usd'))
-            if kk not in keys and not any(kk[0] == a and (kk[1] is None or b is None) for a, b in keys): rs.append(r); keys.add(kk)
+            if kk not in keys and not any(kk[0] == a and (kk[1] is None or b is None) for a, b in keys): rs.append(r); keys.add(kk); continue
+            # same round seen again: keep its investor lists (sweeps add participants the first record lacked)
+            for i, x in enumerate(rs):
+                if str(x.get('date'))[:7] == kk[0] and (x.get('amount_usd') == kk[1] or x.get('amount_usd') is None or kk[1] is None):
+                    x = dict(x)
+                    for f in ('lead_investors', 'investors'):
+                        x[f] = names(x.get(f)) + [n for n in names(r.get(f)) if n.lower() not in {m.lower() for m in names(x.get(f))}]
+                    if x.get('amount_usd') is None and kk[1] is not None: x['amount_usd'] = kk[1]
+                    rs[i] = x; break
         base = dict(base); base['funding_rounds'] = rs
         for f in ('website', 'hq_country', 'offering', 'status', 'total_raised_usd'):
             if not base.get(f) and other.get(f): base[f] = other[f]
         enrich[k] = base
+def investors_of(r):
+    out, seen = [], set()
+    for n in names(r.get('lead_investors')) + names(r.get('investors')):
+        if n.lower() not in seen: seen.add(n.lower()); out.append(n)
+    return out
 def rounds_of(e):
     rs = [r for r in (e.get('funding_rounds') or []) if r.get('source_url') and r.get('date')]
     return sorted(rs, key=lambda r: str(r.get('date')), reverse=True)
@@ -125,7 +141,8 @@ def attach(row, e):
         'offering': e.get('offering') or '', 'website': e.get('website') or '', 'status': e.get('status') or '',
         'parent': e.get('parent') or '', 'total_raised': e.get('total_raised_usd'),
         'rounds': [{'stage': r.get('stage'), 'date': str(r.get('date')), 'amount': r.get('amount_usd'),
-                    'leads': [l if isinstance(l, str) else str(l.get('name', l)) for l in (r.get('lead_investors') if isinstance(r.get('lead_investors'), list) else [r.get('lead_investors')] if r.get('lead_investors') else [])][:4], 'url': r.get('source_url'), 'quote': (r.get('quote') or '')[:220]} for r in rs[:10]],
+                    'leads': names(r.get('lead_investors'))[:8], 'investors': investors_of(r)[:40],
+                    'url': r.get('source_url'), 'quote': (r.get('quote') or '')[:220]} for r in rs[:25]],
         'funded_12m': bool(recent), 'stage_12m': recent[0].get('stage') if recent else '',
         'raised_12m': sum((r.get('amount_usd') or 0) for r in recent if isinstance(r.get('amount_usd'), (int, float))) or None,
     })

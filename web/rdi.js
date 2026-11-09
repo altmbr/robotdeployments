@@ -8,12 +8,24 @@
     SG:'Singapore',UA:'Ukraine',EE:'Estonia',ES:'Spain',AT:'Austria',NZ:'New Zealand',RU:'Russia',TR:'Turkey',HK:'Hong Kong',IE:'Ireland',
     BR:'Brazil',PL:'Poland',PT:'Portugal',BE:'Belgium',AE:'UAE',HU:'Hungary',NG:'Nigeria',GR:'Greece',TH:'Thailand',VN:'Vietnam','??':'Unknown'};
   const CATS = [['autonomous', 'Autonomous'], ['industrial', 'Industrial arms'], ['healthcare', 'Healthcare'], ['consumer', 'Consumer']];
-  const FUNDING = [['all', 'Any funding'], ['12m', 'Raised in last 12 mo'], ['early', 'Pre-seed – Series A, last 12 mo'], ['mid', 'Series B+, last 12 mo']];
+  const FUNDING = [['all', 'Any funding'], ['12m', 'A raise'], ['early', 'A Pre-seed – Series A raise'], ['mid', 'A Series B+ raise']];
   const GROUPS = [['primary_vertical', 'Industry'], ['primary_use_case', 'Task'], ['segment', 'Segment'], ['hq', 'Country'], ['none', 'None']];
   const COLORS_BY = [['segment', 'Segment'], ['hq', 'Country'], ['confidence', 'Confidence']];
   const EARLY = new Set(['pre_seed', 'seed', 'series_a']);
+  const PERIODS = [['1y', 'in the last 12 months', 1], ['2y', 'in the last 2 years', 2], ['3y', 'in the last 3 years', 3], ['5y', 'in the last 5 years', 5], ['ever', 'at any time', 0]];
+  const NOT_RAISE = new Set(['acquired']);
   const STAGES = {pre_seed:'Pre-seed',seed:'Seed',series_a:'Series A',series_b:'Series B',series_c:'Series C',series_d_plus:'Series D+',growth:'Growth',debt:'Debt',grant:'Grant',ipo:'IPO',acquired:'Acquired'};
-  const R = window.RDI = { ready: false, CATS, FUNDING, GROUPS, COLORS_BY, OTHER };
+  const R = window.RDI = { ready: false, CATS, FUNDING, GROUPS, COLORS_BY, OTHER, PERIODS };
+  R.list = v => !v || v === 'all' ? [] : String(v).split(',').filter(Boolean);
+  // raises (not acquisitions) dated inside the period, counted back from the build date
+  R.raises = (d, period) => {
+    const y = (PERIODS.find(p => p[0] === period) || PERIODS[0])[2];
+    let cut = '';
+    if (y) { const b = new Date((R.built || new Date().toISOString().slice(0, 10)) + 'T12:00:00'); b.setFullYear(b.getFullYear() - y); cut = b.toISOString().slice(0, 10); }
+    return (d.rounds || []).filter(r => r.date && !NOT_RAISE.has(r.stage) && String(r.date) >= cut);
+  };
+  R.fundKinds = (d, period) => { const rs = R.raises(d, period), k = new Set();
+    if (rs.length) k.add('12m'); rs.forEach(r => k.add(EARLY.has(r.stage) ? 'early' : 'mid')); return k; };
   R.cname = c => COUNTRY[c] || c;
   R.stage = s => STAGES[s] || (s || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
   R.short = n => n == null ? '—' : n >= 1e6 ? (n / 1e6).toFixed(n >= 1e7 ? 0 : 1) + 'M' : n >= 1e3 ? Math.round(n / 1e3) + 'K' : String(Math.round(n));
@@ -56,10 +68,10 @@
   // except: skip one facet (for facet counts)
   R.match = (d, f, except) => (except === 'cat' || f.cat === 'all' || d.board === f.cat)
     && (except === 'conf' || f.conf === 'all' || (f.conf === 'h' ? d.confidence === 'high' : d.confidence !== 'low'))
-    && (except === 'country' || f.country === 'all' || d.hq === f.country)
+    && (except === 'country' || ((!R.list(f.country).length || R.list(f.country).includes(d.hq)) && !R.list(f.exCountry).includes(d.hq)))
     && (except === 'vertical' || f.vertical === 'all' || d.verticals.includes(f.vertical))
     && (except === 'usecase' || f.usecase === 'all' || d.use_cases.includes(f.usecase))
-    && (except === 'funding' || f.funding === 'all' || (d.funded_12m && (f.funding === '12m' || (f.funding === 'early' ? EARLY.has(d.stage_12m) : !EARLY.has(d.stage_12m)))))
+    && (except === 'funding' || f.funding === 'all' || R.fundKinds(d, f.period).has(f.funding))
     && !(f.exAmazon && d.company === 'Amazon Robotics')
     && (!f.q || d.company.toLowerCase().includes(f.q.toLowerCase()));
   R.filter = (f, src) => (src || R.D).filter(d => R.match(d, f));
@@ -69,7 +81,7 @@
     rows.forEach(d => {
       if (key === 'cat') add(d.board, d); else if (key === 'country') add(d.hq, d);
       else if (key === 'vertical') d.verticals.forEach(v => add(v, d)); else if (key === 'usecase') d.use_cases.forEach(v => add(v, d));
-      else if (key === 'funding') { if (d.funded_12m) { add('12m', d); add(EARLY.has(d.stage_12m) ? 'early' : 'mid', d); } }
+      else if (key === 'funding') R.fundKinds(d, f.period).forEach(k => add(k, d));
     });
     return { total: rows.length, m };
   };

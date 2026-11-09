@@ -109,7 +109,7 @@ def clean_row(r):
     o['active'] = max(act) if act and r.get('active') else None
     orders = [c['count'] for c in cl if c['metric'] == 'orders_or_backlog']
     o['orders'] = max(orders) if orders and r.get('orders') else None
-    o['rounds'] = [{k: x.get(k) for k in ('stage', 'date', 'amount', 'leads', 'url', 'quote')} for x in r.get('rounds') or [] if is_http(x.get('url'))]
+    o['rounds'] = [{k: x.get(k) for k in ('stage', 'date', 'amount', 'leads', 'investors', 'url', 'quote')} for x in r.get('rounds') or [] if is_http(x.get('url'))]
     # lifecycle evidence is researcher-written; publish it only where it explains a status change
     o['life_evidence'] = r.get('life_evidence') if is_http(r.get('life_url')) and r.get('lifecycle') in ('shut_down', 'exited_robots', 'acquired_active') else None
     o['life_url'] = r.get('life_url') if is_http(r.get('life_url')) else None

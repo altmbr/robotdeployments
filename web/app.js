@@ -225,7 +225,7 @@
         moreClaims: claims.length > 4 ? (this.state.allClaims ? 'Show fewer' : `Show all ${claims.length}`) : '',
         toggleClaims: () => this.setState((s) => ({ allClaims: !s.allClaims, open: -1 })),
         rounds: rounds.map((r, i) => { const url = /^https?:/.test(r.url || '') ? r.url : '';
-          return { i, amount: R.money(r.amount) || R.stage(r.stage), stage: r.amount ? R.stage(r.stage) : '', when: when(r.date), leads: r.leads && r.leads.length ? r.leads.join(', ') : '', url, host: host(url) }; }),
+          return { i, amount: R.money(r.amount) || R.stage(r.stage), stage: r.amount ? R.stage(r.stage) : '', when: when(r.date), leads: r.leads && r.leads.length ? r.leads.join(', ') : '', others: (r.investors || []).filter((n) => !(r.leads || []).includes(n)), url, host: host(url) }; }),
       };
     }
     render() {
@@ -291,7 +291,7 @@
                 <span style=${S('color:#8a8984;font-size:12px;white-space:nowrap')}>${r.when}</span>
               </span>
               <span style=${S('display:flex;gap:6px;font-size:12px;color:#8a8984;min-width:0')}>
-                ${r.leads && html`<span style=${S('overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}>${r.leads}</span>`}
+                ${(r.leads || r.others.length > 0) && html`<span title=${[r.leads && 'Led by ' + r.leads, r.others.length && 'With ' + r.others.join(', ')].filter(Boolean).join('. ')} style=${S('overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}>${r.leads}${r.leads && r.others.length ? ' · ' : ''}${r.others.length ? 'with ' + r.others.slice(0, 3).join(', ') + (r.others.length > 3 ? ' +' + (r.others.length - 3) : '') : ''}</span>`}
                 ${r.url && html`<a href=${r.url} target="_blank" rel="noopener" style=${S('color:#2a78d6;white-space:nowrap')}>${r.host} ↗</a>`}
               </span>
             </span>
@@ -308,7 +308,7 @@
 
   // ===================================================================== App (Robot Index)
   const PROPS = { defaultCategory: 'all', detailStyle: 'panel', showLegend: true };
-  const PERSIST = ['cat', 'vertical', 'usecase', 'funding', 'country', 'conf', 'exAmazon', 'groupBy', 'colorBy', 'view', 'subset', 'hidden', 'hiddenCos'];
+  const PERSIST = ['cat', 'vertical', 'usecase', 'funding', 'period', 'country', 'exCountry', 'conf', 'exAmazon', 'groupBy', 'colorBy', 'view', 'subset', 'hidden', 'hiddenCos'];
 
   class App extends Component {
     constructor(p) {
@@ -316,7 +316,7 @@
       let saved = {};
       try { saved = JSON.parse(localStorage.getItem('rdi-index-v2') || '{}'); } catch (e) {}
       this.state = { w: 1200,
-        cat: PROPS.defaultCategory, vertical: 'all', usecase: 'all', funding: 'all', country: 'all', conf: 'all', exAmazon: false, q: '',
+        cat: PROPS.defaultCategory, vertical: 'all', usecase: 'all', funding: 'all', period: '1y', country: 'all', exCountry: '', conf: 'all', exAmazon: false, q: '',
         groupBy: 'primary_vertical', colorBy: 'segment', view: 'map', subset: 'counted', zoom: null, sel: null, menu: null, menuQ: '', sub: null, hidden: {}, hiddenCos: [], flash: null, flashN: 0, ...saved };
     }
     rootRef = (el) => {
@@ -455,9 +455,10 @@
       const setHidden = (list) => this.setState((st) => ({ hidden: { ...(st.hidden || {}), [st.groupBy]: list }, zoom: null }));
       const wide = s.w >= 1000, drawer = p.detailStyle === 'drawer' || !wide;
       const CATL = { all: 'all robots', autonomous: 'autonomous robots', industrial: 'industrial arms', healthcare: 'healthcare robots', consumer: 'consumer robots' };
-      const FUNDL = { all: 'any funding history', '12m': 'a raise in the last 12 months', early: 'a Pre-seed–Series A raise in the last 12 months', mid: 'a Series B+ raise in the last 12 months' };
+      const FUNDL = { all: 'any funding history', '12m': 'a raise', early: 'a Pre-seed–Series A raise', mid: 'a Series B+ raise' };
+      const PERL = Object.fromEntries(R.PERIODS.map(([k, l]) => [k, l]));
       const GRPL = { primary_vertical: 'industry', primary_use_case: 'task', segment: 'segment', hq: 'country', none: 'nothing (companies only)' };
-      const POST = { usecase: ',', funding: '.', groupBy: hid.length ? ',' : '.' };
+      const POST = { usecase: ',', funding: s.funding === 'all' ? '.' : '', period: '.', groupBy: hid.length ? ',' : '.' };
       const mq = s.menuQ.trim().toLowerCase();
       const optStyle = (on) => ({ display: 'flex', alignItems: 'center', border: 0, borderRadius: 8, padding: '7px 10px', font: 'inherit', fontSize: 13.5, cursor: 'pointer',
         background: on ? '#f4f3f0' : 'transparent', color: '#0b0b0b', fontWeight: on ? 600 : 400, flex: 'none', gap: 16, whiteSpace: 'nowrap' });
@@ -466,10 +467,20 @@
         style: { background: 'none', border: 0, padding: 0, font: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap', color: isSet ? '#2a78d6' : '#0b0b0b', fontWeight: 600,
           textDecoration: 'underline', textDecorationStyle: isSet ? 'solid' : 'dotted', textDecorationColor: isSet ? '#2a78d6' : '#8a8984', textUnderlineOffset: 5, textDecorationThickness: 1.5 },
         options: options.filter((o) => !searchPh || !mq || o.value === 'all' || o.label.toLowerCase().includes(mq))
-          .map((o) => ({ ...o, style: optStyle(o.value === s[key]), onClick: () => this.up({ [key]: o.value, menu: null, menuQ: '' }, true) })) });
+          .map((o) => ({ ...o, style: optStyle(o.on != null ? o.on : o.value === s[key]), onClick: o.onClick || (() => this.up({ [key]: o.value, menu: null, menuQ: '' }, true)) })) });
       const tagOpts = (key, anyL, order, lab) => { const fx = R.facet(s, key);
         return [{ value: 'all', label: anyL, count: fx.total }, ...order.filter((v) => fx.m.has(v) || v === s[key]).map((v) => ({ value: v, label: lab(v), count: (fx.m.get(v) || { n: 0 }).n }))]; };
       const fc = R.facet(s, 'cat'), ff = R.facet(s, 'funding');
+      const inc = R.list(s.country), exc = R.list(s.exCountry);
+      const nm = (xs) => xs.length === 1 ? R.cname(xs[0]) : xs.length === 2 ? `${R.cname(xs[0])} or ${R.cname(xs[1])}` : `${xs.length} countries`;
+      const countryLabel = (inc.length ? nm(inc) : 'any country') + (exc.length && !inc.length ? ' except ' + nm(exc).replace(' or ', ' and ') : '');
+      const setC = (i, e) => this.up({ country: i.length ? i.join(',') : 'all', exCountry: e.join(',') }, true);
+      const countryOpts = () => tagOpts('country', 'any country', R.COUNTRIES, R.cname).map((o) => o.value === 'all'
+        ? { ...o, on: !inc.length && !exc.length, onClick: () => this.up({ country: 'all', exCountry: '', menu: null, menuQ: '' }, true) }
+        : { ...o, on: inc.includes(o.value), keepOpen: true,
+            onClick: () => setC(inc.includes(o.value) ? inc.filter((x) => x !== o.value) : [...inc, o.value], exc.filter((x) => x !== o.value)),
+            alt: { label: exc.includes(o.value) ? 'excluded' : 'exclude', on: exc.includes(o.value),
+              onClick: (ev) => { ev.stopPropagation(); setC(inc.filter((x) => x !== o.value), exc.includes(o.value) ? exc.filter((x) => x !== o.value) : [...exc, o.value]); } } });
 
       let hits = [];
       if (s.q.trim()) {
@@ -511,12 +522,14 @@
           slot('cat', 'Counting', CATL[s.cat], false, [['all']].concat(R.CATS).map(([v]) => ({ value: v, label: CATL[v], count: R.short(v === 'all' ? [...fc.m.values()].reduce((t, x) => t + x.units, 0) : (fc.m.get(v) || { units: 0 }).units) }))),
           slot('vertical', 'in', s.vertical === 'all' ? 'any industry' : R.VN[s.vertical] || s.vertical, s.vertical !== 'all', tagOpts('vertical', 'any industry', R.VERTICALS, (v) => R.VN[v] || v), 'Filter industries'),
           slot('usecase', 'for', s.usecase === 'all' ? 'any task' : R.UCN[s.usecase] || s.usecase, s.usecase !== 'all', tagOpts('usecase', 'any task', R.USECASES, (v) => R.UCN[v] || v), 'Filter tasks'),
-          slot('country', 'from companies based in', s.country === 'all' ? 'any country' : R.cname(s.country), s.country !== 'all', tagOpts('country', 'any country', R.COUNTRIES, R.cname), 'Filter countries'),
+          slot('country', 'from companies based in', countryLabel, inc.length + exc.length > 0, countryOpts(), 'Filter countries'),
           slot('funding', 'with', FUNDL[s.funding], s.funding !== 'all', R.FUNDING.map(([v]) => ({ value: v, label: FUNDL[v], count: v === 'all' ? ff.total : (ff.m.get(v) || { n: 0 }).n }))),
+          ...(s.funding === 'all' ? [] : [slot('period', '', PERL[s.period] || PERL['1y'], s.period !== '1y', R.PERIODS.map(([v]) => ({ value: v, label: PERL[v],
+            count: R.D.filter((d) => R.match(d, { ...s, period: v })).length })))]),
           slot('groupBy', 'Grouped by', GRPL[s.groupBy], false, R.GROUPS.map(([v]) => ({ value: v, label: GRPL[v], count: '' }))),
         ],
-        nActive: ['vertical', 'usecase', 'country', 'funding'].filter((k) => s[k] !== 'all').length + hid.length + hidCos.length,
-        clearAll: () => this.up({ vertical: 'all', usecase: 'all', country: 'all', funding: 'all', hidden: {}, hiddenCos: [] }, true),
+        nActive: ['vertical', 'usecase', 'country', 'funding'].filter((k) => s[k] !== 'all').length + (s.exCountry ? 1 : 0) + hid.length + hidCos.length,
+        clearAll: () => this.up({ vertical: 'all', usecase: 'all', country: 'all', exCountry: '', funding: 'all', period: '1y', hidden: {}, hiddenCos: [] }, true),
         onHide: (key) => { if (!hid.includes(key)) setHidden([...hid, key]); },
         onHideCo: (name) => this.setState((st) => ({ hiddenCos: [...(st.hiddenCos || []).filter((x) => x !== name), name], sel: st.sel && st.sel.company === name ? null : st.sel })),
         hiddenChips: [
@@ -685,7 +698,10 @@
                   <input type="search" placeholder=${s.searchPh} value=${v.menuQ} onChange=${v.onMenuQ} autoFocus style=${S('width:100%;border:1px solid #e3e2dd;background:#fcfcfb;border-radius:8px;padding:6px 10px;font:inherit;font-size:13px;color:#0b0b0b;outline:none')} />
                 </div>`}
                 <div style=${S('overflow:auto;padding:4px 6px 6px;display:flex;flex-direction:column')}>
-                  ${s.options.map((o) => html`<button key=${o.value} onClick=${o.onClick} style=${o.style} className=${H('background:#f4f3f0')}><span style=${S('flex:1;text-align:left')}>${o.label}</span><span style=${S('color:#8a8984;font-size:12px;font-variant-numeric:tabular-nums')}>${o.count}</span></button>`)}
+                  ${s.options.map((o) => html`<div key=${o.value} style=${S('display:flex;align-items:center;gap:4px')}>
+                    <button onClick=${o.onClick} style=${{ ...o.style, flex: 1 }} className=${H('background:#f4f3f0')}>${o.keepOpen && html`<span aria-hidden="true" style=${S('width:14px;flex:none;color:#2a78d6')}>${o.on ? '✓' : ''}</span>`}<span style=${S('flex:1;text-align:left')}>${o.label}</span><span style=${S('color:#8a8984;font-size:12px;font-variant-numeric:tabular-nums')}>${o.count}</span></button>
+                    ${o.alt && html`<button onClick=${o.alt.onClick} title=${'Exclude companies based in ' + o.label} style=${S('flex:none;border:1px solid ' + (o.alt.on ? '#e34948' : '#e3e2dd') + ';background:' + (o.alt.on ? '#fdecec' : '#fff') + ';color:' + (o.alt.on ? '#c02f2e' : '#8a8984') + ';border-radius:999px;padding:2px 8px;font:inherit;font-size:11.5px;cursor:pointer')}>${o.alt.label}</button>`}
+                  </div>`)}
                 </div>
               </div>`}
             </span>

@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS rounds (
   id serial PRIMARY KEY, company text NOT NULL REFERENCES companies(company) ON DELETE CASCADE,
   stage text, date text, amount double precision, leads jsonb, url text, quote text
 );
+ALTER TABLE rounds ADD COLUMN IF NOT EXISTS investors jsonb;  -- every participant incl. leads
 CREATE INDEX IF NOT EXISTS claims_company ON claims(company);
 CREATE INDEX IF NOT EXISTS rounds_company ON rounds(company);
 -- visitor submissions (Submit a company). PRIVATE: never served by the API, never auto-published;
@@ -66,8 +67,8 @@ async function load() {
           await c.query('INSERT INTO claims (company,count,metric,as_of,type,url,quote,conf,source) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)',
             [r.company, x.count, x.metric, x.as_of, x.type, x.url, x.quote, x.conf, x.source || null]);
         for (const x of rounds)
-          await c.query('INSERT INTO rounds (company,stage,date,amount,leads,url,quote) VALUES ($1,$2,$3,$4,$5,$6,$7)',
-            [r.company, x.stage, x.date, x.amount, JSON.stringify(x.leads || []), x.url, x.quote]);
+          await c.query('INSERT INTO rounds (company,stage,date,amount,leads,investors,url,quote) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
+            [r.company, x.stage, x.date, x.amount, JSON.stringify(x.leads || []), JSON.stringify(x.investors || []), x.url, x.quote]);
       }
     }
     const seed = fs.existsSync(SEED) ? JSON.parse(fs.readFileSync(SEED)) : {};
@@ -93,7 +94,7 @@ async function dataset() {
   const [co, cl, ro, me] = await Promise.all([
     pool.query('SELECT c.company, c.list, c.row, a.added_at FROM companies c LEFT JOIN company_added a USING (company)'),
     pool.query('SELECT company,count,metric,as_of,type,url,quote,conf,source FROM claims ORDER BY id'),
-    pool.query('SELECT company,stage,date,amount,leads,url,quote FROM rounds ORDER BY id'),
+    pool.query('SELECT company,stage,date,amount,leads,investors,url,quote FROM rounds ORDER BY id'),
     pool.query('SELECT key, value FROM meta'),
   ]);
   const by = (rows) => rows.reduce((m, { company, ...x }) => ((m[company] ||= []).push(x), m), {});

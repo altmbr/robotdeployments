@@ -56,4 +56,4 @@ applies to a material share of the company's deployments, and mark ONE `primary`
 
 ## Funding fields
 `stage` uses: `pre_seed`, `seed`, `series_a`, `series_b`, `series_c`, `series_d_plus`, `growth` (late private, incl. strategic), `debt`, `grant`, `ipo`, `public` (listed: no rounds), `acquired`, `corporate_division` (unit of a larger company: no rounds), `unknown`.
-Every round needs `date` (YYYY-MM or YYYY-MM-DD), `amount_usd` (number or null), `lead_investors` (list), `source_url`, and a verbatim `quote` (<=300 chars). No source, no round.
+Every round needs `date` (YYYY-MM or YYYY-MM-DD), `amount_usd` (number or null), `lead_investors` (list), `investors` (list of EVERY participant incl. leads, as named in the source), `source_url`, and a verbatim `quote` (<=300 chars). No source, no round.
