@@ -69,7 +69,7 @@ ul.az{columns:2;padding:0;list-style:none}ul.az li{padding:3px 0;break-inside:av
 <div class="top"><a href="${BASE}"><b>Robot Deployment Index</b></a><a href="${BASE}/companies">All companies</a></div>
 ${body}
 <p class="muted" style="margin-top:40px">Robots = the largest credible public claim of units shipped, deployed or in fleet. Orders, pilots and production capacity never count. Updated ${esc(when(built) || built)}.</p>
-</main></body></html>`;
+</main><script src="/robot-deployment-index/subscribe.js" defer></script></body></html>`;
 
   function companyPage(d) {
     const slug = slugs.get(d.company), tags = [UCN[d.primary_use_case], VN[d.primary_vertical]].filter(Boolean);
