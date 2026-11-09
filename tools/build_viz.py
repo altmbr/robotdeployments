@@ -122,7 +122,21 @@ def investors_of(r):
     return out
 def rounds_of(e):
     rs = [r for r in (e.get('funding_rounds') or []) if r.get('source_url') and r.get('date')]
-    return sorted(rs, key=lambda r: str(r.get('date')), reverse=True)
+    # Collapse the same round reported twice (same stage + month, e.g. CNY vs USD conversions, or a sweep
+    # re-reporting it): keep the best-sourced copy (a real article over a news-search link; with an amount),
+    # and union the investor lists.
+    best = {}
+    for r in rs:
+        k = (r.get('stage') or 'unknown', str(r.get('date'))[:7])
+        if k[0] == 'unknown': k = (k[0], k[1], r.get('amount_usd'))
+        q = ('news.google.com' not in (r.get('source_url') or ''), r.get('amount_usd') is not None, len(names(r.get('investors'))))
+        if k not in best: best[k] = (q, dict(r)); continue
+        (bq, br) = best[k]
+        keep, other = (dict(r), br) if q > bq else (br, r)
+        for f in ('lead_investors', 'investors'):
+            keep[f] = names(keep.get(f)) + [n for n in names(other.get(f)) if n.lower() not in {m.lower() for m in names(keep.get(f))}]
+        best[k] = (max(q, bq), keep)
+    return sorted((v[1] for v in best.values()), key=lambda r: str(r.get('date')), reverse=True)
 CUTOFF = '2025-11-05'
 def slugs(xs):
     out = []
