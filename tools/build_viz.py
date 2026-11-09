@@ -186,12 +186,14 @@ V_SYN = {'logistics': 'logistics_warehousing', 'warehouse_logistics': 'logistics
          'food_service': 'hospitality_food_service'}
 def ucs(x): return [UC_SYN.get(u, u) for u in slugs(x)]
 def vs(x): return [V_SYN.get(v, v) for v in slugs(x)]
+def uc1(x): return UC_SYN.get(one(x), one(x))
+def v1(x): return V_SYN.get(one(x), one(x))
 def attach(row, e):
     rs = rounds_of(e)
     recent = [r for r in rs if str(r['date']) >= CUTOFF]
     row.update({
-        'use_cases': [u for u in dict.fromkeys(ucs(e.get('use_cases'))) if u in UC_NAMES], 'primary_use_case': UC_SYN.get(one(e.get('primary_use_case')), one(e.get('primary_use_case'))),
-        'verticals': [v for v in dict.fromkeys(vs(e.get('verticals'))) if v in V_NAMES], 'primary_vertical': V_SYN.get(one(e.get('primary_vertical')), one(e.get('primary_vertical'))),
+        'use_cases': [u for u in dict.fromkeys(ucs(e.get('use_cases'))) if u in UC_NAMES], 'primary_use_case': uc1(e.get('primary_use_case')),
+        'verticals': [v for v in dict.fromkeys(vs(e.get('verticals'))) if v in V_NAMES], 'primary_vertical': v1(e.get('primary_vertical')),
         'offering': e.get('offering') or '', 'website': e.get('website') or '', 'status': e.get('status') or '',
         'parent': e.get('parent') or '', 'total_raised': e.get('total_raised_usd'),
         'rounds': [{'stage': r.get('stage'), 'date': str(r.get('date')), 'amount': r.get('amount_usd'),
@@ -220,7 +222,7 @@ BOARD_OF = {'surgery_clinical': 'healthcare', 'assist_rehab': 'healthcare', 'lab
             'household_chores': 'consumer', 'manufacturing_process': 'industrial'}
 for k, e in enrich.items():
     if k in seen or e.get('is_robot_maker') is False: continue
-    uc = UC_SYN.get(one(e.get('primary_use_case')), one(e.get('primary_use_case')))
+    uc = uc1(e.get('primary_use_case'))
     seg = UC_SEG.get(uc, 'other')
     row = {'company': e['company'], 'board': BOARD_OF.get(uc, 'autonomous'), 'segment': seg, 'segment_label': SEG.get(seg, 'Other'),
            'hq': cc(e.get('hq_country')), 'units': 0, 'orders': None, 'metric': 'no public count', 'as_of': '', 'confidence': 'low',

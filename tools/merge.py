@@ -89,8 +89,8 @@ for f in sorted(glob.glob(f'{ROOT}/research/claims/*.jsonl')):
         c['count'] = num(c.get('count'))
         # a news.google.com redirect is not a citation: swap in the resolved publisher URL, else hold the claim
         if c.get('source_url') in GN_RESOLVED: c['source_url'] = GN_RESOLVED[c['source_url']]
-        if'news.google.com' in (c.get('source_url') or ''): held_gn += 1; continue
-        sig =(norm(c.get('company')), c.get('metric'), c['count'], str(c.get('as_of')), (c.get('source_url') or '')[:120])
+        if 'news.google.com' in (c.get('source_url') or ''): held_gn += 1; continue
+        sig = (norm(c.get('company')), c.get('metric'), c['count'], str(c.get('as_of')), (c.get('source_url') or '')[:120])
         if sig in seen: dups += 1; continue
         seen.add(sig); claims.append(c)
 
@@ -121,7 +121,7 @@ for k, cs in by_co.items():
     base = best or cs[0]
     def pick(field):
         vals = [c.get(field) for c in cs if c.get(field)]
-        return max(set(vals), key=vals.count) if vals else ''
+        return max(dict.fromkeys(vals), key=vals.count) if vals else ''  # ties -> first seen (set order is random per run)
     orders = [c for c in cs if c['count'] and c.get('metric') == 'orders_or_backlog']
     geo = defaultdict(float)
     if best:

@@ -61,8 +61,19 @@ Headline = max credible shipped/deployed/installed/fleet claim; orders, pilots a
 - Shut down → `research/verify/status_*.jsonl` (lifecycle `shut_down`, ended, public source_url).
 - New company metadata → `research/enrich/*.jsonl` (copy the format of `manual_2026-11-06.jsonl`).
 - X handles → `research/handles/out/*.jsonl`; only `status: confirmed` ships (`x_handle`, shown in the company panel).
+  A confirmed line is never overwritten by a later `no_account` line.
+- Count comes from a different product line than the current business (Yujin: 1M lifetime = old vacuums) →
+  `data/tag_overrides.json` (any field: tags, hq; segment follows). Same file for HQ conflicts between sweeps.
+- Off-taxonomy task/industry tags from agents map to TAXONOMY slugs in build_viz `UC_SYN`/`V_SYN`; add new strays there.
+- Investor name variants → `data/investor_aliases.json` (variant → canonical; ambiguous ones in `_suspicious.json`).
+- Wrong USD conversion on a round → `research/verify/fx_fixes*.jsonl` (`verdict: fix`, keyed company + month + old amount).
+- Grok hunt claims: per-claim rejects in `tools/grok_verify.py` `REJECT_CLAIM` ((company, count) → reason), whole-company in `REJECT`.
 - Robot-test rulings: driver-assist devices (comma.ai) and aimed weapons (ZeroMark) are not robots; autonomous
   balloons count (WindBorne, Near Space Labs) with headline = units aloft, never cumulative launches.
+  Not robots: purely mechanical exoskeletons, camera gimbals (OBSBOT), prosthetic hands, dexterous hands (components),
+  human-driven EV trucks/tractors. Educational robot kits count (Makeblock, Sphero, Robo Wunderkind).
+- Count hygiene: "几十/数百/dozens/hundreds" = no number; "近N"/"nearly N" is below N (not N); a year's shipments
+  is `annual_shipments`, never cumulative; sites/projects/customers are not units.
 
 ## Names found in private sources (meetings, fund folders, the owner's lists)
 Add a company only if public sources confirm it exists as a robotics company (stealth names are confidential);
@@ -76,6 +87,14 @@ log the rest in `private/granola_cos/not_published.jsonl`. Never hint at sources
 - WebSearch has a shared ~200-call session budget: one long background workflow (e.g. the X-handle hunt) starves every
   other research run. Don't run search-heavy workflows in parallel; never scrape search engines to get around it.
 - Fund-portfolio sweeps: one agent per fund → dedupe vs `data/companies.csv` + aliases → research batches of 5.
+- Non-US companies: `tools/gnews.py search <en|zh|ja|ko|de|ch|in|fr> '<query>'` (Google News RSS per market). Its
+  link resolver 429s under load, so agents can see headlines but not open articles: run `tools/grok_hunt.py
+  --targets <json>` (local-language prompts, ~$0.09/co) then `tools/grok_verify.py` (GBK/EUC-KR/Shift-JIS + CJK quote
+  matching) and read every verified claim. Country source recipes: `research/funding_sources_{cn,in,dach,jp,kr}.md`.
+- Claims citing a news.google.com link are held by merge.py until `tools/gn_resolve_claims.py` (slow, resumable) maps
+  them to the publisher URL (`research/verify/gn_resolved.jsonl`).
+- Deployment hunts only target companies with NO count, so existing counts go stale (Matic sat at 10k while 17k was
+  public): run a periodic refresh on counts older than ~3 months.
 
 ## Local test + deploy check
 - `docker run -d --rm --name rdi-pg -e POSTGRES_PASSWORD=x -p 55499:5432 postgres:16`, then
