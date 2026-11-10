@@ -98,9 +98,9 @@
     };
     const x = el('button', 'subpop-close', { type: 'button', textContent: '×', ariaLabel: 'Close', onclick: () => close('close') });
     const by = el('div', 'subpop-by');
-    by.innerHTML = '<img src="/robot-deployment-index/avatar.jpg" alt="" width="46" height="46"><div><b>bryan altman</b><span>i built this index. maybetheway is my blog.</span></div>';
+    by.innerHTML = '<img src="/robot-deployment-index/avatar.jpg" alt="" width="46" height="46"><div><b>bryan altman</b><span>i built this index, and i write a blog.</span></div>';
     const h = el('h2', 'subpop-h', { id: 'subpop-h' }); h.innerHTML = 'don&rsquo;t miss <em>the next one</em>.';
-    const p = el('p', 'subpop-p', { textContent: 'essays on startups and investing, with a robotics and physical ai bent. straight to your inbox every so often. unsubscribe anytime.' });
+    const p = el('p', 'subpop-p', { textContent: 'essays on startups and investing, with a focus on robotics and physical ai. straight to your inbox every so often. unsubscribe anytime.' });
     const form = el('form', 'subpop-form'), input = emailInput('subpop-input', 'popup'), btn = el('button', 'subpop-btn', { type: 'submit', textContent: 'subscribe →' });
     const err = el('span', 'subpop-err'), later = el('button', 'subpop-later', { type: 'button', textContent: 'maybe later', onclick: () => close('later') });
     form.append(input, btn);
