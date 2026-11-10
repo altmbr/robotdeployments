@@ -15,7 +15,7 @@
 .subfooter{position:fixed;left:0;right:0;bottom:0;z-index:50;padding:13px 24px;background:#edf1fb;border-top:1px solid #d8e0f4;animation:subfooter-up .35s ease-out both;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
 @keyframes subfooter-up{from{transform:translateY(100%)}to{transform:translateY(0)}}
 @media (prefers-reduced-motion:reduce){.subfooter{animation:none}}
-.subfooter-inner{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px 16px;max-width:780px;margin:0 auto;font-size:15px;line-height:1.5;color:#4f4f48}
+.subfooter-inner{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px 16px;max-width:980px;margin:0 auto;font-size:15px;line-height:1.5;color:#4f4f48}
 .subfooter-form{display:flex;gap:8px}
 .subfooter-input{font:inherit;font-size:15px;color:#1f1f1c;background:#fff;border:1px solid #c8d2ee;border-radius:6px;padding:7px 11px;width:200px;max-width:100%}
 .subfooter-input:focus{outline:none;border-color:#1b56d6;box-shadow:0 0 0 2px rgba(27,86,214,.15)}
@@ -71,7 +71,7 @@
 
   function footer() {
     const bar = el('div', 'subfooter', { role: 'region', ariaLabel: 'Subscribe' }), inner = el('div', 'subfooter-inner');
-    const msg = el('span', 'subfooter-msg', { textContent: 'i write maybetheway. join the list to get notified when i publish.' });
+    const msg = el('span', 'subfooter-msg', { textContent: 'i write about startups, investing, robotics and physical ai. get notified when i publish.' });
     const form = el('form', 'subfooter-form'), input = emailInput('subfooter-input', 'footer'), btn = el('button', 'subfooter-btn', { type: 'submit', textContent: 'subscribe →' });
     const err = el('span', 'subfooter-err');
     form.append(input, btn); inner.append(msg, form, err); bar.append(inner);
