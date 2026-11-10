@@ -86,7 +86,7 @@
       const root = d3.hierarchy(tree).sum((d) => d.units || 0).sort((a, b) => b.value - a.value);
       // Two passes: a group too small for its 20px label strip gets no strip (the strip would crush its tiles to slivers
       // and leave an empty outlined box); its name still shows in the hover tip.
-      const layout = (noHead) => d3.treemap().size([W, Hh]).paddingInner(2).paddingOuter(grouped ? 3 : 0)
+      const layout = (noHead) => d3.treemap().size([W, Hh]).paddingInner(2).paddingOuter((n) => !grouped ? 0 : n.depth > 0 && noHead.has(n.data[0]) ? 1 : 3)
         .paddingTop((n) => grouped && n.depth > 0 && n.children && !noHead.has(n.data[0]) ? 20 : 0).round(true)(root);
       let small = new Set();
       layout(small);
@@ -94,23 +94,27 @@
         small = new Set(root.children.filter((n) => n.y1 - n.y0 < 44 || n.x1 - n.x0 < 64).map((n) => n.data[0]));
         if (small.size) layout(small);
       }
+      // tiles under 4px read as stray lines; skip them (the group box beneath still takes hover/click)
+      const big = (l) => l.x1 - l.x0 >= 4 && l.y1 - l.y0 >= 4;
       const tipAt = (e, extra) => { const r = this.box.getBoundingClientRect(), k = r.width / (this.box.offsetWidth || 1);
         this.setState({ tip: { ...extra, x: (e.clientX - r.left) / k, y: (e.clientY - r.top) / k } }); };
       const hov = this.state.tip;
       if (grouped) base.groups = root.descendants().filter((n) => n.depth > 0 && n.children).map((n) => {
         const key = n.data[0], w = n.x1 - n.x0, full = R.labelOf(groupBy, key);
         const hot = hov && (hov.g === key || (hov.d && hov.d[groupBy] === key));
-        const lab = w > 64 && !small.has(key);
+        const lab = w > 64 && !small.has(key), h = n.y1 - n.y0;
+        const drawn = n.leaves().some(big), solid = !drawn && R.colorOf(n.leaves()[0].data, colorBy);
         return { key, label: lab ? full : '', value: lab ? R.short(n.value) : '',
-          style: { position: 'absolute', left: n.x0, top: n.y0, width: w, height: n.y1 - n.y0, background: '#ffffff', borderRadius: 6, boxShadow: hot ? 'inset 0 0 0 1.5px #8a8984' : 'none' },
+          headStyle: { display: 'flex', alignItems: 'baseline', gap: 6, height: lab ? 20 : '100%', padding: '3px 3px 0 6px', cursor: 'zoom-in', overflow: 'hidden', whiteSpace: 'nowrap' },
+          style: { position: 'absolute', left: n.x0, top: n.y0, width: w, height: h, background: solid || (lab ? '#ffffff' : 'transparent'),
+            borderRadius: solid ? Math.min(4, w / 4, h / 4) : 6, boxShadow: !hot ? 'none' : solid ? 'inset 0 0 0 2px #0b0b0b' : lab ? 'inset 0 0 0 1.5px #8a8984' : 'none' },
           onClick: () => p.onZoom && p.onZoom(key),
           onHide: p.onHide && lab ? (e) => { e.stopPropagation(); this.setState({ tip: null }); p.onHide(key); } : null,
           flash: p.flash === 'g:' + key,
           onMove: (e) => tipAt(e, { g: key, label: full, value: n.value, n: n.leaves().length }) };
       });
       const sel = p.selected;
-      // tiles under 4px read as stray lines; skip them (the group box beneath still takes hover/click)
-      base.tiles = root.leaves().filter((l) => l.data && l.data.company && l.x1 - l.x0 >= 4 && l.y1 - l.y0 >= 4).map((l) => {
+      base.tiles = root.leaves().filter((l) => l.data && l.data.company && big(l)).map((l) => {
         const d = l.data, w = Math.max(0, l.x1 - l.x0), h = Math.max(0, l.y1 - l.y0), bg = R.colorOf(d, colorBy), isSel = sel && sel === d.company;
         const showName = w >= 46 && h >= 24;
         return { key: d.company, name: d.company, units: R.short(d.units), showName, showUnits: showName && h > 38, flash: p.flash === 'c:' + d.company,
@@ -148,7 +152,7 @@
         ${v.isMap && html`
           <div ref=${this.boxRef} style=${S('position:relative;flex:1;min-height:0')}>
             ${v.groups.map((g) => html`<div key=${'g' + g.key + (g.flash ? p_flash : '')} style=${g.style} className=${'rdi-grp' + (g.flash ? ' rdi-flash' : '')}>
-              <div onClick=${g.onClick} onMouseMove=${g.onMove} onMouseLeave=${this.hideTip} style=${S('display:flex;align-items:baseline;gap:6px;height:20px;padding:3px 3px 0 6px;cursor:zoom-in;overflow:hidden;white-space:nowrap')}>
+              <div onClick=${g.onClick} onMouseMove=${g.onMove} onMouseLeave=${this.hideTip} style=${g.headStyle}>
                 <span style=${S('flex:0 1 auto;min-width:0;font-size:12px;font-weight:650;overflow:hidden;text-overflow:ellipsis')}>${g.label}</span>
                 <span style=${S('flex:none;font-size:11.5px;color:#8a8984;font-variant-numeric:tabular-nums')}>${g.value}</span>
                 ${g.onHide && html`<button className="rdi-x" onClick=${g.onHide} onMouseMove=${(e) => e.stopPropagation()} title=${'Hide ' + g.label} aria-label=${'Hide ' + g.label}
@@ -563,6 +567,7 @@
         showUncounted: () => this.setState({ view: 'table', subset: 'none' }),
         showGone: () => this.setState({ view: 'table', subset: 'gone' }),
         onZoom: (z) => this.setState({ zoom: z }), onSelect: (d) => this.setState({ sel: d }), closeDetail: () => this.setState({ sel: null }),
+        submitLabel: s.w < 560 ? 'Submit' : 'Submit a company',
         panelInline: !!selObj && !drawer, panelDrawer: !!selObj && drawer,
         bodyGrid: { flex: 1, minHeight: 520, display: 'grid', gap: 14, gridTemplateColumns: selObj && !drawer ? 'minmax(0,1fr) 390px' : 'minmax(0,1fr)' },
       };
@@ -700,7 +705,7 @@
                 </div>
               </div>`}
             </div>
-            <button onClick=${v.openSubNew} className=${H('background:#33332f')} style=${S('display:inline-flex;align-items:center;gap:8px;border:0;background:#0b0b0b;color:#fcfcfb;border-radius:999px;padding:10px 18px 10px 15px;font:inherit;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap;box-shadow:0 2px 10px rgba(11,11,11,.18)')}><span style=${S('font-size:17px;line-height:1;font-weight:500')}>+</span>Submit a company</button>
+            <button onClick=${v.openSubNew} className=${H('background:#33332f')} style=${S('display:inline-flex;align-items:center;gap:8px;border:0;background:#0b0b0b;color:#fcfcfb;border-radius:999px;padding:10px 18px 10px 15px;font:inherit;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap;box-shadow:0 2px 10px rgba(11,11,11,.18)')}><span style=${S('font-size:17px;line-height:1;font-weight:500')}>+</span>${v.submitLabel}</button>
           </div>
         </header>
 
@@ -763,7 +768,7 @@
 
         ${v.panelDrawer && html`
           <div onClick=${v.closeDetail} style=${S('position:fixed;inset:0;background:rgba(11,11,11,.18);z-index:30')}></div>
-          <div style=${S('position:fixed;top:0;right:0;bottom:0;width:min(400px, 100vw);background:#fcfcfb;border-left:1px solid #e3e2dd;box-shadow:-16px 0 40px rgba(0,0,0,.1);z-index:31')}>${detail}</div>`}
+          <div style=${S('position:fixed;top:0;right:0;bottom:var(--subfoot, 0px);width:min(400px, 100vw);background:#fcfcfb;border-left:1px solid #e3e2dd;box-shadow:-16px 0 40px rgba(0,0,0,.1);z-index:31')}>${detail}</div>`}
 
         ${v.subOpen && this.renderSubmit(v)}
       </div>`;

@@ -2,7 +2,7 @@
 // Ported verbatim from the Claude Design project "Robot Index" (rdi.js). Reads window.ROBOT_DATA (/data.js).
 (function () {
   if (window.RDI) return;
-  const PAL = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6', '#e34948'], OTHER = '#b9b8b2';
+  const PAL = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6', '#e34948', '#0f9fb5', '#a84fc4'], OTHER = '#b9b8b2';
   const COUNTRY = {US:'United States',CN:'China',JP:'Japan',DE:'Germany',NL:'Netherlands',NO:'Norway',CH:'Switzerland',DK:'Denmark',FR:'France',
     GB:'United Kingdom',KR:'South Korea',IL:'Israel',IN:'India',CA:'Canada',SE:'Sweden',IT:'Italy',TW:'Taiwan',AU:'Australia',FI:'Finland',
     SG:'Singapore',UA:'Ukraine',EE:'Estonia',ES:'Spain',AT:'Austria',NZ:'New Zealand',RU:'Russia',TR:'Turkey',HK:'Hong Kong',IE:'Ireland',
@@ -45,7 +45,7 @@
       d.verticals = d.verticals || []; d.use_cases = d.use_cases || []; d.claims = d.claims || []; });
     R.SEGN = {}; D.forEach(d => { R.SEGN[d.segment] = d.segment_label; });
     const sum = (key) => { const m = new Map(); D.forEach(d => m.set(d[key], (m.get(d[key]) || 0) + (d.units || 0))); return [...m].sort((a, b) => b[1] - a[1]).map(x => x[0]); };
-    const segOrder = ['warehouse_logistics', 'agriculture', 'service_cleaning_hospitality', 'robotaxi_av', 'humanoid', 'security_defense', 'last_mile_delivery', 'industrial_arms_cobots'];
+    const segOrder = ['warehouse_logistics', 'agriculture', 'service_cleaning_hospitality', 'robotaxi_av', 'humanoid', 'security_defense', 'last_mile_delivery', 'industrial_arms_cobots', 'consumer_home', 'drones'];
     R.COLORS = {
       segment: new Map(segOrder.map((k, i) => [k, PAL[i]])),
       hq: new Map(sum('hq').slice(0, 7).map((k, i) => [k, PAL[i]])),

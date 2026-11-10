@@ -28,9 +28,13 @@
 .subpop-close{position:absolute;top:15px;right:15px;width:31px;height:31px;border:none;background:transparent;color:#9a9a90;font-size:21px;line-height:1;cursor:pointer;border-radius:9px}
 .subpop-close:hover{background:#efebdf;color:#1f1f1c}
 .subpop-eyebrow{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:#1b56d6;margin-bottom:15px}
+.subpop-by{display:flex;align-items:center;gap:12px;margin-bottom:20px;padding-right:28px}
+.subpop-by img{width:46px;height:46px;border-radius:50%;object-fit:cover;flex:none;background:#e7e3d8}
+.subpop-by b{display:block;font-size:15px;font-weight:600;color:#1f1f1c;line-height:1.3}
+.subpop-by span{display:block;font-size:13px;color:#7c7c72;line-height:1.3}
 .subpop-h{font-size:28px;line-height:1.14;letter-spacing:-.02em;font-weight:600;color:#1f1f1c;margin:0 0 12px;text-wrap:balance}
 .subpop-h em{font-family:Georgia,serif;font-style:italic;font-weight:400}
-.subpop-p{font-size:16px;line-height:1.55;color:#4f4f48;margin:0 0 22px;max-width:34ch}
+.subpop-p{font-size:16px;line-height:1.55;color:#4f4f48;margin:0 0 22px;max-width:36ch}
 .subpop-form{display:flex;gap:10px}
 .subpop-input{flex:1;min-width:0;border:1px solid #c6d2ef;background:#fff;border-radius:10px;padding:11px 14px;font:inherit;font-size:15px;color:#1f1f1c;outline:none}
 .subpop-input:focus{border-color:#1b56d6}
@@ -75,7 +79,7 @@
     document.body.append(bar);
     ph('subscribe_footer_viewed', { reason: 'form', source: 'footer' });
     // keep the page's last row (legend, footer links) clear of the fixed bar
-    const pad = () => { document.body.style.paddingBottom = bar.offsetHeight + 'px'; };
+    const pad = () => { document.body.style.paddingBottom = bar.offsetHeight + 'px'; document.documentElement.style.setProperty('--subfoot', bar.offsetHeight + 'px'); };
     pad(); window.addEventListener('resize', pad);
   }
 
@@ -93,13 +97,15 @@
       else if (!e.shiftKey && document.activeElement === f[f.length - 1]) { e.preventDefault(); f[0].focus(); }
     };
     const x = el('button', 'subpop-close', { type: 'button', textContent: '×', ariaLabel: 'Close', onclick: () => close('close') });
+    const by = el('div', 'subpop-by');
+    by.innerHTML = '<img src="/robot-deployment-index/avatar.jpg" alt="" width="46" height="46"><div><b>bryan altman</b><span>i built this index. maybetheway is my blog.</span></div>';
     const h = el('h2', 'subpop-h', { id: 'subpop-h' }); h.innerHTML = 'don&rsquo;t miss <em>the next one</em>.';
-    const p = el('p', 'subpop-p', { textContent: 'my essays on investing and building, straight to your inbox every so often. unsubscribe anytime.' });
+    const p = el('p', 'subpop-p', { textContent: 'essays on startups and investing, with a robotics and physical ai bent. straight to your inbox every so often. unsubscribe anytime.' });
     const form = el('form', 'subpop-form'), input = emailInput('subpop-input', 'popup'), btn = el('button', 'subpop-btn', { type: 'submit', textContent: 'subscribe →' });
     const err = el('span', 'subpop-err'), later = el('button', 'subpop-later', { type: 'button', textContent: 'maybe later', onclick: () => close('later') });
     form.append(input, btn);
-    form.onsubmit = (e) => { e.preventDefault(); submit(input, btn, err, () => card.replaceChildren(x, el('div', 'subpop-eyebrow', { textContent: 'maybetheway' }), el('p', 'subpop-msg', { textContent: 'check your inbox to confirm →' })), 'popup'); };
-    card.append(x, el('div', 'subpop-eyebrow', { textContent: 'maybetheway' }), h, p, form, err, later);
+    form.onsubmit = (e) => { e.preventDefault(); submit(input, btn, err, () => card.replaceChildren(x, by, el('p', 'subpop-msg', { textContent: 'check your inbox to confirm →' })), 'popup'); };
+    card.append(x, by, h, p, form, err, later);
     scrim.append(card);
     scrim.onmousedown = (e) => { if (e.target === scrim) close('scrim'); };
     document.addEventListener('keydown', onKey, true);

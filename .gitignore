@@ -25,3 +25,4 @@ node_modules/
 *.pyc
 *.bak
 /tools/verify_workflow.js
+.gstack/
