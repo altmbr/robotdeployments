@@ -3,7 +3,7 @@
 // posts to the site's own /api/subscribe and shares its cookie/session flags: a subscriber or a
 // dismissal on either site suppresses both. Plain DOM, no framework, so it stays independent of app.js.
 (function () {
-  const COOKIE = 'altmbr_subscribed', DISMISS_KEY = 'altmbr_popup_dismissed', DELAY_MS = 20000;
+  const COOKIE = 'altmbr_subscribed', DISMISS_KEY = 'altmbr_popup_dismissed', DELAY_MS = 15000;
   const hasCookie = () => document.cookie.split('; ').some((c) => c.startsWith(COOKIE + '='));
   const dismissed = () => { try { return !!sessionStorage.getItem(DISMISS_KEY); } catch (e) { return false; } };
   const markDismissed = () => { try { sessionStorage.setItem(DISMISS_KEY, '1'); } catch (e) {} };
