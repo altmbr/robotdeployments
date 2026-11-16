@@ -95,6 +95,11 @@ log the rest in `private/granola_cos/not_published.jsonl`. Never hint at sources
   them to the publisher URL (`research/verify/gn_resolved.jsonl`).
 - Deployment hunts only target companies with NO count, so existing counts go stale (Matic sat at 10k while 17k was
   public): run a periodic refresh on counts older than ~3 months.
+- A new claim for an EXISTING company can silently move it to another board if its `segment`/`form_factor` differ
+  (even with a null count): copy both from the company's existing claims, and diff the company list in
+  `public/data.json` against `git show HEAD:public/data.json` (added / removed / changed) before committing.
+- `tools/receipts.py` dies with JSONDecodeError if any file under `receipts/web/` is corrupt (one is, dated
+  2026-11-05); until it skips bad files, save the receipt by hand in the same JSON shape.
 
 ## Local test + deploy check
 - `docker run -d --rm --name rdi-pg -e POSTGRES_PASSWORD=x -p 55499:5432 postgres:16`, then
